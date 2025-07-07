@@ -35,6 +35,16 @@
             letter-spacing: 2px;
             text-shadow: 0 0 8px #FFD700, 0 0 16px #fff;
         }
+        
+        .combo-info {
+            color: #FF6B6B;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 0 8px #FF6B6B;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+        
         @keyframes info-glow {
             0% { text-shadow: 0 0 8px #FFD700, 0 0 16px #fff; }
             100% { text-shadow: 0 0 16px #FFD700, 0 0 32px #fff; }
@@ -108,21 +118,50 @@
             box-shadow: none;
         }
         
+        .special-ball-indicator {
+            font-size: 14px;
+            color: #FFD700;
+            margin-bottom: 8px;
+            text-shadow: 0 0 8px #FFD700;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .special-ball-indicator.active {
+            opacity: 1;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
         .instructions {
             display: none;
         }
     </style>
 </head>
 <body>
+
+    <!-- 画面右上に固定表示 -->
+    <div class="global-status" style="position:fixed;top:24px;right:32px;z-index:10001;text-align:right;min-width:180px;">
+        <div class="stage-info" id="stageInfo" style="color:#FFD700;font-weight:bold;font-size:18px;text-shadow:0 0 8px #FFD700,0 0 16px #fff;">ステージ: <b>1</b> ／ 目標スコア: <b>350</b></div>
+        <div class="combo-info" id="comboInfo" style="color:#FF6B6B;font-size:18px;font-weight:bold;text-shadow:0 0 8px #FF6B6B;">コンボ: 0 (×1.0)</div>
+    </div>
+
     <div class="game-container">
         <h1 style="color: #FFD700; margin-bottom: 20px;">Web Pachi</h1>
-        
+
         <div class="game-info">
             <span>玉数: <span id="ballCount">10</span></span>
             <span>スコア: <span id="score">0</span></span>
         </div>
+
+        <div class="special-ball-indicator" id="specialBallIndicator">⭐ 特殊ボール準備中 ⭐</div>
+
         <div id="effectLayer" style="position:absolute;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:10;"></div>
-        
+
         <canvas id="gameCanvas" width="400" height="480"></canvas>
         
         <div class="controls">
@@ -132,14 +171,13 @@
             <button id="launchBtn">発射！ (スペースキー)</button>
             <button id="resetBtn">リセット</button>
         </div>
-        
-        <!-- 操作方法の説明は削除 -->
     </div>
 
     <script>
         // ゲーム状態
         let canvas, ctx;
         let balls = [];
+        let ballTrails = []; // ボールの軌跡
         let obstacles = [];
         let pockets = [];
         let score = 0;
@@ -152,6 +190,12 @@
         let targetScore = 350;
         let ballsPerStage = 10;
         let ballsBonus = 3;
+        
+        // 新機能
+        let combo = 0;
+        let comboMultiplier = 1.0;
+        let ballsLaunched = 0;
+        let isSpecialBallReady = false;
 
         // 初期化
         function init() {
@@ -161,6 +205,7 @@
             setupObstacles();
             setupPockets();
             setupEvents();
+            updateComboDisplay();
             
             gameRunning = true;
             gameLoop();
@@ -170,7 +215,6 @@
         function setupObstacles() {
             const rows = 6;
             const cols = 5;
-            // くぎのY座標を全体的に上に移動（元: y=150+row*60 → y=70+row*50）
             for (let row = 0; row < rows; row++) {
                 for (let col = 0; col < cols; col++) {
                     const x = 80 + col * 60 + (row % 2) * 30;
@@ -200,12 +244,10 @@
             const launchBtn = document.getElementById('launchBtn');
             const resetBtn = document.getElementById('resetBtn');
             
-            // ボタンイベント
             launchBtn.addEventListener('mousedown', startPowerCharge);
             launchBtn.addEventListener('mouseup', launchBall);
             resetBtn.addEventListener('click', resetGame);
             
-            // キーボードイベント
             document.addEventListener('keydown', (e) => {
                 if (e.code === 'Space') {
                     e.preventDefault();
@@ -229,36 +271,85 @@
             isChargingPower = true;
         }
 
-        // ボール発射（発射レーンを上昇してから物理挙動に切り替え）
+        // 特殊ボールの判定
+        function getSpecialBallType() {
+            // ballsLaunchedは「今から発射するボールが何発目か」を示す
+            // 10発目がゴールデン、5発目がレインボー
+            const next = ballsLaunched + 1;
+            if (next % 10 === 0) {
+                return 'golden';
+            }
+            if (next % 5 === 0) {
+                return 'rainbow';
+            }
+            return 'normal';
+        }
+
+        // ボール発射
         function launchBall() {
             if (!isChargingPower || ballCount <= 0) return;
             isChargingPower = false;
             ballCount--;
-            // 発射レーンのスタート位置
+            
             const startX = canvas.width - 30;
             const startY = canvas.height - 40;
-            const endY = 40;
+            const specialType = getSpecialBallType();
+            
             const ball = {
                 x: startX,
                 y: startY,
                 vx: 0,
                 vy: 0,
                 radius: 8,
-                color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+                color: getBallColor(specialType),
                 launching: true,
-                launchPower: power
+                launchPower: power,
+                specialType: specialType,
+                trail: [] // 軌跡
             };
             balls.push(ball);
+            ballsLaunched++;
             updateDisplay();
-            showLaunchEffect(ball.x, ball.y);
+            updateSpecialBallIndicator();
+            showLaunchEffect(ball.x, ball.y, specialType);
+        }
+
+        // ボールの色を取得
+        function getBallColor(specialType) {
+            switch(specialType) {
+                case 'golden':
+                    return '#FFD700';
+                case 'rainbow':
+                    return `hsl(${Date.now() / 10 % 360}, 100%, 60%)`;
+                default:
+                    return `hsl(${Math.random() * 360}, 70%, 60%)`;
+            }
+        }
+
+        // 特殊ボールインジケーター更新
+        function updateSpecialBallIndicator() {
+            const indicator = document.getElementById('specialBallIndicator');
+            const next = ballsLaunched + 1;
+            const nextSpecial = 10 - ((next - 1) % 10);
+            if (nextSpecial === 1) {
+                indicator.textContent = '⭐ 次はゴールデンボール！ ⭐';
+                indicator.classList.add('active');
+            } else if (nextSpecial <= 4) {
+                indicator.textContent = `⭐ あと${nextSpecial - 1}発でゴールデンボール ⭐`;
+                indicator.classList.add('active');
+            } else {
+                indicator.classList.remove('active');
+            }
         }
 
         // 発射エフェクト
-        function showLaunchEffect(x, y) {
+        function showLaunchEffect(x, y, specialType) {
             const effectLayer = document.getElementById('effectLayer');
-            for (let i = 0; i < 18; i++) {
+            const particleCount = specialType === 'golden' || specialType === 'rainbow' ? 24 : 18;
+            
+            for (let i = 0; i < particleCount; i++) {
                 const p = document.createElement('div');
-                const angle = (i / 18) * Math.PI * 2;
+                const angle = (i / particleCount) * Math.PI * 2;
                 const px = x + Math.cos(angle) * 12;
                 const py = y + Math.sin(angle) * 12;
                 p.style.position = 'absolute';
@@ -267,7 +358,17 @@
                 p.style.width = '8px';
                 p.style.height = '8px';
                 p.style.borderRadius = '50%';
-                p.style.background = `linear-gradient(45deg, #FFD700, #FF8E53)`;
+                
+                if (specialType === 'golden') {
+                    p.style.background = `linear-gradient(45deg, #FFD700, #FFA500)`;
+                    p.style.boxShadow = '0 0 8px #FFD700';
+                } else if (specialType === 'rainbow') {
+                    p.style.background = `linear-gradient(45deg, hsl(${i * 15}, 100%, 60%), hsl(${(i * 15 + 60) % 360}, 100%, 60%))`;
+                    p.style.boxShadow = '0 0 8px rgba(255,255,255,0.8)';
+                } else {
+                    p.style.background = `linear-gradient(45deg, #FFD700, #FF8E53)`;
+                }
+                
                 p.style.opacity = '0.8';
                 p.style.pointerEvents = 'none';
                 p.style.zIndex = '100';
@@ -299,102 +400,149 @@
             }
         }
 
-        // ゲームオーバーダイアログ表示済みフラグ
+        // コンボ更新
+        function updateCombo(success) {
+            if (success) {
+                combo++;
+                comboMultiplier = 1.0 + (combo * 0.2);
+            } else {
+                combo = 0;
+                comboMultiplier = 1.0;
+            }
+            updateComboDisplay();
+        }
+
+        // コンボ表示更新
+        function updateComboDisplay() {
+            const comboInfo = document.getElementById('comboInfo');
+            comboInfo.textContent = `コンボ: ${combo} (×${comboMultiplier.toFixed(1)})`;
+            
+            if (combo > 0) {
+                comboInfo.style.color = combo >= 5 ? '#FF1493' : '#FF6B6B';
+                comboInfo.style.fontSize = combo >= 3 ? '20px' : '18px';
+            } else {
+                comboInfo.style.color = '#999';
+                comboInfo.style.fontSize = '18px';
+            }
+        }
+
         let gameOverDialogShown = false;
+
         // ボール更新
         function updateBalls() {
             for (let i = balls.length - 1; i >= 0; i--) {
                 const ball = balls[i];
+                
+                // 軌跡を記録
+                if (!ball.launching) {
+                    ball.trail.push({x: ball.x, y: ball.y});
+                    if (ball.trail.length > 8) {
+                        ball.trail.shift();
+                    }
+                }
+                
+                // レインボーボールの色更新
+                if (ball.specialType === 'rainbow') {
+                    ball.color = `hsl(${Date.now() / 10 % 360}, 100%, 60%)`;
+                }
+                
                 // 発射レーン上昇中
                 if (ball.launching) {
-                    // 上昇アニメーション
                     ball.y -= 12 + (ball.launchPower / 10);
                     if (ball.y <= 40) {
                         ball.y = 40;
-                        // 上まで到達したら物理挙動に切り替え
                         ball.launching = false;
-                        // ここで初めて物理速度を与える
                         ball.vx = -1 - (ball.launchPower / 150) * 4;
                         ball.vy = -2 - (ball.launchPower / 150) * 6;
                     }
                     continue;
                 }
+                
                 // 重力と空気抵抗
                 ball.vy += 0.3;
                 ball.vx *= 0.999;
-                // 位置更新
                 ball.x += ball.vx;
                 ball.y += ball.vy;
+                
                 // 壁との衝突
                 if (ball.x - ball.radius <= 0 || ball.x + ball.radius >= canvas.width) {
                     ball.vx *= -0.7;
                     ball.x = Math.max(ball.radius, Math.min(canvas.width - ball.radius, ball.x));
                     showWallEffect(ball.x, ball.y);
                 }
+                
                 // 障害物との衝突
                 obstacles.forEach(obstacle => {
                     const dx = ball.x - obstacle.x;
                     const dy = ball.y - obstacle.y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     if (distance < ball.radius + obstacle.radius) {
-                        // 法線ベクトル
                         const nx = dx / distance;
                         const ny = dy / distance;
-                        // 接線ベクトル
                         const tx = -ny;
                         const ty = nx;
-                        // 速度ベクトルを法線・接線成分に分解
                         const v_n = ball.vx * nx + ball.vy * ny;
                         const v_t = ball.vx * tx + ball.vy * ty;
-                        // 反射係数
                         const restitution = 0.7;
-                        // 法線成分を反転＋減衰、接線成分はそのまま
                         const v_n_after = -v_n * restitution;
-                        // 合成して新しい速度に
                         ball.vx = v_n_after * nx + v_t * tx;
                         ball.vy = v_n_after * ny + v_t * ty;
-                        // ボールを障害物から離す
                         const overlap = ball.radius + obstacle.radius - distance;
                         ball.x += nx * overlap;
                         ball.y += ny * overlap;
                         showObstacleEffect(obstacle.x, obstacle.y);
                     }
                 });
+                
                 // ポケットとの衝突
                 pockets.forEach(pocket => {
                     if (ball.x > pocket.x && 
                         ball.x < pocket.x + pocket.width &&
                         ball.y > pocket.y && 
                         ball.y < pocket.y + pocket.height) {
-                        score += pocket.points;
+                        
+                        let points = pocket.points;
+                        
+                        // 特殊ボールの得点倍率
+                        if (ball.specialType === 'golden') {
+                            points *= 2;
+                        } else if (ball.specialType === 'rainbow') {
+                            points *= 1.5;
+                        }
+                        
+                        // コンボ倍率適用
+                        points = Math.floor(points * comboMultiplier);
+                        
+                        score += points;
+                        updateCombo(true);
                         balls.splice(i, 1);
                         updateDisplay();
-                        showScoreEffect(pocket.x + pocket.width/2, pocket.y + pocket.height/2, pocket.points);
+                        showScoreEffect(pocket.x + pocket.width/2, pocket.y + pocket.height/2, points, ball.specialType);
                         return;
                     }
                 });
+                
                 // 画面下から消えたボールを削除
                 if (ball.y > canvas.height + 50) {
+                    updateCombo(false); // コンボリセット
                     balls.splice(i, 1);
                 }
             }
+            
             // ステージクリア・ゲームオーバー判定
             if (ballCount <= 0 && balls.length === 0 && !gameOverDialogShown) {
                 if (score >= targetScore) {
-                    // ステージクリア時は止めずに自動で次ステージへ進行、花火エフェクトのみ
                     for (let i = 0; i < 3; i++) {
                         setTimeout(() => showFirework(200 + i*80, 200 + Math.random()*100), i*400);
                     }
                     nextStage();
-                    gameOverDialogShown = false; // 継続
+                    gameOverDialogShown = false;
                 } else {
                     showGameOverDialog(score);
                     gameOverDialogShown = true;
                 }
             }
         }
-
-        // （不要な重複判定を削除）
 
         // 壁エフェクト
         function showWallEffect(x, y) {
@@ -418,6 +566,7 @@
             setTimeout(() => effectLayer.removeChild(p), 600);
             effectLayer.appendChild(p);
         }
+
         // 釘エフェクト
         function showObstacleEffect(x, y) {
             const effectLayer = document.getElementById('effectLayer');
@@ -446,18 +595,29 @@
                 effectLayer.appendChild(p);
             }
         }
+
         // 得点エフェクト
-        function showScoreEffect(x, y, points) {
+        function showScoreEffect(x, y, points, specialType) {
             const effectLayer = document.getElementById('effectLayer');
             const p = document.createElement('div');
             p.textContent = `+${points}`;
             p.style.position = 'absolute';
             p.style.left = (canvas.getBoundingClientRect().left + x - 18) + 'px';
             p.style.top = (canvas.getBoundingClientRect().top + y - 18) + 'px';
-            p.style.fontSize = '28px';
+            p.style.fontSize = specialType === 'golden' ? '32px' : '28px';
             p.style.fontWeight = 'bold';
-            p.style.color = '#FFD700';
-            p.style.textShadow = '0 0 8px #fff, 0 0 16px #FFD700';
+            
+            if (specialType === 'golden') {
+                p.style.color = '#FFD700';
+                p.style.textShadow = '0 0 12px #FFD700, 0 0 24px #FFA500';
+            } else if (specialType === 'rainbow') {
+                p.style.color = '#FF1493';
+                p.style.textShadow = '0 0 12px #FF1493, 0 0 24px #00FFFF';
+            } else {
+                p.style.color = '#FFD700';
+                p.style.textShadow = '0 0 8px #fff, 0 0 16px #FFD700';
+            }
+            
             p.style.opacity = '1';
             p.style.pointerEvents = 'none';
             p.style.zIndex = '200';
@@ -472,8 +632,8 @@
 
         // 描画
         function draw() {
-            // 背景をクリア
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
             // 発射台装飾
             ctx.save();
             ctx.fillStyle = 'rgba(255,255,255,0.8)';
@@ -483,6 +643,7 @@
             ctx.shadowBlur = 12;
             ctx.fill();
             ctx.restore();
+            
             // 障害物を描画
             ctx.fillStyle = '#8B4513';
             obstacles.forEach(obstacle => {
@@ -490,11 +651,11 @@
                 ctx.arc(obstacle.x, obstacle.y, obstacle.radius, 0, Math.PI * 2);
                 ctx.fill();
             });
+            
             // ポケットを描画
             pockets.forEach(pocket => {
                 ctx.fillStyle = '#FFD700';
                 ctx.fillRect(pocket.x, pocket.y, pocket.width, pocket.height);
-                // 得点表示
                 ctx.fillStyle = '#000';
                 ctx.font = '12px Arial';
                 ctx.textAlign = 'center';
@@ -502,12 +663,52 @@
                     pocket.x + pocket.width/2, 
                     pocket.y + pocket.height/2 + 4);
             });
+            
+            // ボールの軌跡を描画
+            balls.forEach(ball => {
+                if (ball.trail && ball.trail.length > 1) {
+                    ctx.strokeStyle = ball.specialType === 'rainbow' ? 
+                        `hsla(${Date.now() / 10 % 360}, 100%, 60%, 0.3)` : 
+                        'rgba(255, 215, 0, 0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(ball.trail[0].x, ball.trail[0].y);
+                    for (let i = 1; i < ball.trail.length; i++) {
+                        ctx.lineTo(ball.trail[i].x, ball.trail[i].y);
+                    }
+                    ctx.stroke();
+                }
+            });
+            
             // ボールを描画
             balls.forEach(ball => {
+                // 特殊ボールのオーラ
+                if (ball.specialType === 'golden') {
+                    ctx.save();
+                    ctx.shadowColor = '#FFD700';
+                    ctx.shadowBlur = 15;
+                    ctx.fillStyle = ball.color;
+                    ctx.beginPath();
+                    ctx.arc(ball.x, ball.y, ball.radius + 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                } else if (ball.specialType === 'rainbow') {
+                    ctx.save();
+                    ctx.shadowColor = ball.color;
+                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = ball.color;
+                    ctx.beginPath();
+                    ctx.arc(ball.x, ball.y, ball.radius + 1, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+                
+                // 通常のボール描画
                 ctx.fillStyle = ball.color;
                 ctx.beginPath();
                 ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
                 ctx.fill();
+                
                 // 光沢効果
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
                 ctx.beginPath();
@@ -522,19 +723,12 @@
             const scoreElem = document.getElementById('score');
             ballCountElem.textContent = ballCount;
             scoreElem.textContent = score;
-            // ステージ・目標スコア表示
-            let stageElem = document.getElementById('stageInfo');
-            if (!stageElem) {
-                stageElem = document.createElement('div');
-                stageElem.id = 'stageInfo';
-                stageElem.style.color = '#FFD700';
-                stageElem.style.fontWeight = 'bold';
-                stageElem.style.fontSize = '18px';
-                stageElem.style.marginBottom = '8px';
-                document.querySelector('.game-info').insertAdjacentElement('beforebegin', stageElem);
+            // ステージ・コンボ表示を画面右上に
+            const stageElem = document.getElementById('stageInfo');
+            if (stageElem) {
+                stageElem.innerHTML = `ステージ: <b>${stage}</b> ／ 目標スコア: <b>${targetScore}</b>`;
             }
-            stageElem.innerHTML = `ステージ: <b>${stage}</b> ／ 目標スコア: <b>${targetScore}</b>`;
-            // アニメーション
+            // コンボ表示はupdateComboDisplay()で管理
             ballCountElem.animate([
                 { transform: 'scale(1)', color: '#fff' },
                 { transform: 'scale(1.3)', color: '#FFD700' },
@@ -552,9 +746,7 @@
         // ゲームオーバー演出
         function showGameOverDialog(finalScore) {
             const effectLayer = document.getElementById('effectLayer');
-            // pointer-eventsを有効化
             effectLayer.style.pointerEvents = 'auto';
-            // 既存のダイアログがあれば削除
             const oldDialog = document.getElementById('gameOverDialog');
             if (oldDialog && oldDialog.parentNode) oldDialog.parentNode.removeChild(oldDialog);
             const dialog = document.createElement('div');
@@ -574,52 +766,13 @@
             dialog.style.fontWeight = 'bold';
             dialog.style.color = '#B8860B';
             dialog.style.textShadow = '0 0 8px #fff, 0 0 16px #FFD700';
-            dialog.innerHTML = `<div style=\"font-size:36px; margin-bottom:16px;\">🎉 ゲーム終了！ 🎉</div><div style=\"margin-bottom:12px;\">最終スコア: <span style='color:#FF8E53;'>${finalScore}</span></div><button id='closeGameOverBtn' style='margin-top:18px;font-size:22px;padding:10px 32px;background:linear-gradient(45deg,#FFD700,#FF8E53);color:#fff;border:none;border-radius:18px;box-shadow:0 0 16px #FFD700;pointer-events:auto;'>閉じる</button>`;
+            dialog.innerHTML = `<div style=\"font-size:36px; margin-bottom:16px;\">🎉 ゲーム終了！ 🎉</div><div style=\"margin-bottom:12px;\">最終スコア: <span style='color:#FF8E53;'>${finalScore}</span></div><div style=\"margin-bottom:12px;\">最大コンボ: <span style='color:#FF6B6B;'>${combo}</span></div><button id='closeGameOverBtn' style='margin-top:18px;font-size:22px;padding:10px 32px;background:linear-gradient(45deg,#FFD700,#FF8E53);color:#fff;border:none;border-radius:18px;box-shadow:0 0 16px #FFD700;pointer-events:auto;'>閉じる</button>`;
             effectLayer.appendChild(dialog);
             setTimeout(() => { dialog.style.transform = 'translate(-50%,-50%) scale(1)'; }, 30);
             document.getElementById('closeGameOverBtn').onclick = () => {
                 if (dialog.parentNode) dialog.parentNode.removeChild(dialog);
                 effectLayer.style.pointerEvents = 'none';
-                // gameOverDialogShownはtrueのまま（閉じるボタンでfalseにしない）
             };
-            // 花火エフェクト
-            for (let i = 0; i < 3; i++) {
-                setTimeout(() => showFirework(200 + i*80, 200 + Math.random()*100), i*400);
-            }
-        }
-
-        function showStageClearDialog() {
-            const effectLayer = document.getElementById('effectLayer');
-            effectLayer.style.pointerEvents = 'auto';
-            // 既存のダイアログがあれば削除
-            const oldDialog = document.getElementById('gameOverDialog');
-            if (oldDialog && oldDialog.parentNode) oldDialog.parentNode.removeChild(oldDialog);
-            const dialog = document.createElement('div');
-            dialog.id = 'gameOverDialog';
-            dialog.style.position = 'fixed';
-            dialog.style.left = '50%';
-            dialog.style.top = '50%';
-            dialog.style.transform = 'translate(-50%,-50%) scale(0.8)';
-            dialog.style.background = 'linear-gradient(135deg, #fff8, #4CAF50cc 80%)';
-            dialog.style.border = '4px solid #4CAF50';
-            dialog.style.borderRadius = '24px';
-            dialog.style.boxShadow = '0 0 32px #4CAF50cc, 0 0 64px #fff8';
-            dialog.style.padding = '40px 32px 32px 32px';
-            dialog.style.textAlign = 'center';
-            dialog.style.zIndex = '9999';
-            dialog.style.fontSize = '28px';
-            dialog.style.fontWeight = 'bold';
-            dialog.style.color = '#155724';
-            dialog.style.textShadow = '0 0 8px #fff, 0 0 16px #4CAF50';
-            dialog.innerHTML = `<div style=\"font-size:36px; margin-bottom:16px;\">🎊 ステージクリア！ 🎊</div><div style=\"margin-bottom:12px;\">次のステージへ！<br>ボーナス玉 +${ballsBonus}</div><button id='nextStageBtn' style='margin-top:18px;font-size:22px;padding:10px 32px;background:linear-gradient(45deg,#4CAF50,#FFD700);color:#fff;border:none;border-radius:18px;box-shadow:0 0 16px #4CAF50;pointer-events:auto;'>次へ</button>`;
-            effectLayer.appendChild(dialog);
-            setTimeout(() => { dialog.style.transform = 'translate(-50%,-50%) scale(1)'; }, 30);
-            document.getElementById('nextStageBtn').onclick = () => {
-                if (dialog.parentNode) dialog.parentNode.removeChild(dialog);
-                effectLayer.style.pointerEvents = 'none';
-                nextStage();
-            };
-            // 花火エフェクト
             for (let i = 0; i < 3; i++) {
                 setTimeout(() => showFirework(200 + i*80, 200 + Math.random()*100), i*400);
             }
@@ -657,14 +810,15 @@
         function nextStage() {
             stage++;
             ballCount = ballsBonus + ballsPerStage;
-            // 現在のスコアに対して次の目標スコアを設定
             targetScore = Math.floor(score * 1.5 + 80);
-            // スコアは持ち越し
             power = 50;
             isChargingPower = false;
             powerDirection = 1;
             gameOverDialogShown = false;
+            combo = 0;
+            comboMultiplier = 1.0;
             updateDisplay();
+            updateComboDisplay();
             const powerFill = document.getElementById('powerFill');
             powerFill.style.width = '33.3%';
         }
@@ -680,8 +834,12 @@
             isChargingPower = false;
             powerDirection = 1;
             gameOverDialogShown = false;
+            combo = 0;
+            comboMultiplier = 1.0;
+            ballsLaunched = 0;
             updateDisplay();
-            // ゲームオーバーダイアログがあれば消す
+            updateComboDisplay();
+            updateSpecialBallIndicator();
             const dialog = document.getElementById('gameOverDialog');
             const effectLayer = document.getElementById('effectLayer');
             if (dialog && dialog.parentNode) dialog.parentNode.removeChild(dialog);
