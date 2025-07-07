@@ -148,6 +148,10 @@
         let isChargingPower = false;
         let powerDirection = 1;
         let gameRunning = false;
+        let stage = 1;
+        let targetScore = 350;
+        let ballsPerStage = 10;
+        let ballsBonus = 3;
 
         // 初期化
         function init() {
@@ -315,7 +319,6 @@
                     }
                     continue;
                 }
-                // ...existing code...
                 // 重力と空気抵抗
                 ball.vy += 0.3;
                 ball.vx *= 0.999;
@@ -375,12 +378,23 @@
                     balls.splice(i, 1);
                 }
             }
-            // ゲームオーバー判定
+            // ステージクリア・ゲームオーバー判定
             if (ballCount <= 0 && balls.length === 0 && !gameOverDialogShown) {
-                showGameOverDialog(score);
-                gameOverDialogShown = true;
+                if (score >= targetScore) {
+                    // ステージクリア時は止めずに自動で次ステージへ進行、花火エフェクトのみ
+                    for (let i = 0; i < 3; i++) {
+                        setTimeout(() => showFirework(200 + i*80, 200 + Math.random()*100), i*400);
+                    }
+                    nextStage();
+                    gameOverDialogShown = false; // 継続
+                } else {
+                    showGameOverDialog(score);
+                    gameOverDialogShown = true;
+                }
             }
         }
+
+        // （不要な重複判定を削除）
 
         // 壁エフェクト
         function showWallEffect(x, y) {
@@ -508,6 +522,18 @@
             const scoreElem = document.getElementById('score');
             ballCountElem.textContent = ballCount;
             scoreElem.textContent = score;
+            // ステージ・目標スコア表示
+            let stageElem = document.getElementById('stageInfo');
+            if (!stageElem) {
+                stageElem = document.createElement('div');
+                stageElem.id = 'stageInfo';
+                stageElem.style.color = '#FFD700';
+                stageElem.style.fontWeight = 'bold';
+                stageElem.style.fontSize = '18px';
+                stageElem.style.marginBottom = '8px';
+                document.querySelector('.game-info').insertAdjacentElement('beforebegin', stageElem);
+            }
+            stageElem.innerHTML = `ステージ: <b>${stage}</b> ／ 目標スコア: <b>${targetScore}</b>`;
             // アニメーション
             ballCountElem.animate([
                 { transform: 'scale(1)', color: '#fff' },
@@ -561,6 +587,44 @@
                 setTimeout(() => showFirework(200 + i*80, 200 + Math.random()*100), i*400);
             }
         }
+
+        function showStageClearDialog() {
+            const effectLayer = document.getElementById('effectLayer');
+            effectLayer.style.pointerEvents = 'auto';
+            // 既存のダイアログがあれば削除
+            const oldDialog = document.getElementById('gameOverDialog');
+            if (oldDialog && oldDialog.parentNode) oldDialog.parentNode.removeChild(oldDialog);
+            const dialog = document.createElement('div');
+            dialog.id = 'gameOverDialog';
+            dialog.style.position = 'fixed';
+            dialog.style.left = '50%';
+            dialog.style.top = '50%';
+            dialog.style.transform = 'translate(-50%,-50%) scale(0.8)';
+            dialog.style.background = 'linear-gradient(135deg, #fff8, #4CAF50cc 80%)';
+            dialog.style.border = '4px solid #4CAF50';
+            dialog.style.borderRadius = '24px';
+            dialog.style.boxShadow = '0 0 32px #4CAF50cc, 0 0 64px #fff8';
+            dialog.style.padding = '40px 32px 32px 32px';
+            dialog.style.textAlign = 'center';
+            dialog.style.zIndex = '9999';
+            dialog.style.fontSize = '28px';
+            dialog.style.fontWeight = 'bold';
+            dialog.style.color = '#155724';
+            dialog.style.textShadow = '0 0 8px #fff, 0 0 16px #4CAF50';
+            dialog.innerHTML = `<div style=\"font-size:36px; margin-bottom:16px;\">🎊 ステージクリア！ 🎊</div><div style=\"margin-bottom:12px;\">次のステージへ！<br>ボーナス玉 +${ballsBonus}</div><button id='nextStageBtn' style='margin-top:18px;font-size:22px;padding:10px 32px;background:linear-gradient(45deg,#4CAF50,#FFD700);color:#fff;border:none;border-radius:18px;box-shadow:0 0 16px #4CAF50;pointer-events:auto;'>次へ</button>`;
+            effectLayer.appendChild(dialog);
+            setTimeout(() => { dialog.style.transform = 'translate(-50%,-50%) scale(1)'; }, 30);
+            document.getElementById('nextStageBtn').onclick = () => {
+                if (dialog.parentNode) dialog.parentNode.removeChild(dialog);
+                effectLayer.style.pointerEvents = 'none';
+                nextStage();
+            };
+            // 花火エフェクト
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => showFirework(200 + i*80, 200 + Math.random()*100), i*400);
+            }
+        }
+
         // 花火エフェクト
         function showFirework(cx, cy) {
             const effectLayer = document.getElementById('effectLayer');
@@ -590,11 +654,28 @@
             }
         }
 
+        function nextStage() {
+            stage++;
+            ballCount = ballsBonus + ballsPerStage;
+            // 現在のスコアに対して次の目標スコアを設定
+            targetScore = Math.floor(score * 1.5 + 80);
+            // スコアは持ち越し
+            power = 50;
+            isChargingPower = false;
+            powerDirection = 1;
+            gameOverDialogShown = false;
+            updateDisplay();
+            const powerFill = document.getElementById('powerFill');
+            powerFill.style.width = '33.3%';
+        }
+
         // ゲームリセット
         function resetGame() {
             balls = [];
             score = 0;
-            ballCount = 10;
+            stage = 1;
+            targetScore = 300;
+            ballCount = ballsPerStage;
             power = 50;
             isChargingPower = false;
             powerDirection = 1;
