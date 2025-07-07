@@ -59,11 +59,20 @@
             box-shadow: 0 4px 24px #FFD70033, 0 1.5px 6px #0002;
         }
         
-        .controls {
+        .controls-row {
             margin-top: 10px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        
+        .button-group {
             display: flex;
             flex-direction: column;
             gap: 10px;
+            align-items: flex-end;
         }
         
         .power-meter {
@@ -140,6 +149,31 @@
         .instructions {
             display: none;
         }
+
+        /* 固定コントロール */
+        .fixed-controls {
+            position: fixed;
+            left: 32px;
+            top: 32px;
+            z-index: 10010;
+            background: linear-gradient(135deg, #232526cc 0%, #FFD70033 100%);
+            border-radius: 18px;
+            box-shadow: 0 4px 24px #FFD70033, 0 1.5px 6px #0002;
+            padding: 18px 18px 12px 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 12px;
+        }
+        .fixed-controls .power-meter {
+            margin: 0;
+        }
+        .fixed-controls .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-end;
+        }
     </style>
 </head>
 <body>
@@ -164,12 +198,15 @@
 
         <canvas id="gameCanvas" width="400" height="480"></canvas>
         
-        <div class="controls">
+        <!-- 右上に固定配置 -->
+        <div class="fixed-controls">
             <div class="power-meter">
                 <div class="power-fill" id="powerFill"></div>
             </div>
-            <button id="launchBtn">発射！ (スペースキー)</button>
-            <button id="resetBtn">リセット</button>
+            <div class="button-group">
+                <button id="launchBtn">発射！ (スペースキー)</button>
+                <button id="resetBtn">リセット</button>
+            </div>
         </div>
     </div>
 
