@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Pachi</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .game-container {
+            background: linear-gradient(135deg, #232526 0%, #414345 100%);
+            padding: 18px 18px 12px 18px;
+            border-radius: 24px;
+            box-shadow: 0 8px 32px 0 rgba(31,38,135,0.37), 0 2px 8px #0008;
+            text-align: center;
+            max-width: 440px;
+        }
+        
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 18px;
+            color: #fff;
+            font-weight: bold;
+            font-size: 22px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px #FFD700, 0 0 16px #fff;
+        }
+        @keyframes info-glow {
+            0% { text-shadow: 0 0 8px #FFD700, 0 0 16px #fff; }
+            100% { text-shadow: 0 0 16px #FFD700, 0 0 32px #fff; }
+        }
+        
+        canvas {
+            border: 3px solid #FFD700;
+            border-radius: 18px;
+            background: linear-gradient(to bottom, #b2f0ff 0%, #eaffd0 100%);
+            display: block;
+            margin: 0 auto 18px;
+            box-shadow: 0 4px 24px #FFD70033, 0 1.5px 6px #0002;
+        }
+        
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .power-meter {
+            width: 220px;
+            height: 22px;
+            background: linear-gradient(90deg, #232526 0%, #FFD700 100%);
+            border-radius: 12px;
+            margin: 0 auto;
+            position: relative;
+            border: 2.5px solid #FFD700;
+            box-shadow: 0 0 12px #FFD70055, 0 0 16px #fff2;
+        }
+        .power-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50 0%, #FFEB3B 60%, #FF5722 100%);
+            border-radius: 10px;
+            transition: width 0.1s;
+            width: 50%;
+            box-shadow: 0 0 8px #FFEB3B, 0 0 16px #FF5722;
+        }
+        @keyframes power-glow {
+            0% { box-shadow: 0 0 12px #FFEB3B, 0 0 24px #FF5722; }
+            100% { box-shadow: 0 0 24px #FFEB3B, 0 0 48px #FF5722; }
+        }
+        
+        button {
+            background: linear-gradient(90deg, #FFD700 0%, #FF8E53 100%);
+            border: none;
+            color: #fff;
+            padding: 12px 32px;
+            margin: 0 8px;
+            border-radius: 18px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 18px;
+            transition: transform 0.18s, box-shadow 0.18s;
+            box-shadow: 0 2px 12px #FFD70055, 0 1.5px 6px #FF8E5355;
+            position: relative;
+            overflow: hidden;
+            outline: none;
+        }
+        button:hover {
+            transform: scale(1.06);
+            box-shadow: 0 0 24px #FFD700cc, 0 0 32px #FF8E53cc;
+        }
+        
+        button:disabled {
+            background: #888;
+            color: #eee;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .instructions {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 style="color: #FFD700; margin-bottom: 20px;">Web Pachi</h1>
+        
+        <div class="game-info">
+            <span>玉数: <span id="ballCount">10</span></span>
+            <span>スコア: <span id="score">0</span></span>
+        </div>
+        <div id="effectLayer" style="position:absolute;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:10;"></div>
+        
+        <canvas id="gameCanvas" width="400" height="480"></canvas>
+        
+        <div class="controls">
+            <div class="power-meter">
+                <div class="power-fill" id="powerFill"></div>
+            </div>
+            <button id="launchBtn">発射！ (スペースキー)</button>
+            <button id="resetBtn">リセット</button>
+        </div>
+        
+        <!-- 操作方法の説明は削除 -->
+    </div>
+
+    <script>
+        // ゲーム状態
+        let canvas, ctx;
+        let balls = [];
+        let obstacles = [];
+        let pockets = [];
+        let score = 0;
+        let ballCount = 10;
+        let power = 50;
+        let isChargingPower = false;
+        let powerDirection = 1;
+        let gameRunning = false;
+
+        // 初期化
+        function init() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            
+            setupObstacles();
+            setupPockets();
+            setupEvents();
+            
+            gameRunning = true;
+            gameLoop();
+        }
+
+        // 障害物（釘）の配置
+        function setupObstacles() {
+            const rows = 6;
+            const cols = 5;
+            // くぎのY座標を全体的に上に移動（元: y=150+row*60 → y=70+row*50）
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const x = 80 + col * 60 + (row % 2) * 30;
+                    const y = 70 + row * 50;
+                    if (x < canvas.width - 50) {
+                        obstacles.push({
+                            x: x,
+                            y: y,
+                            radius: 4
+                        });
+                    }
+                }
+            }
+        }
+
+        // ポケット（得点穴）の配置
+        function setupPockets() {
+            pockets.push(
+                { x: 50, y: canvas.height - 80, width: 60, height: 20, points: 100 },
+                { x: 170, y: canvas.height - 100, width: 60, height: 20, points: 50 },
+                { x: 290, y: canvas.height - 80, width: 60, height: 20, points: 100 }
+            );
+        }
+
+        // イベント設定
+        function setupEvents() {
+            const launchBtn = document.getElementById('launchBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            
+            // ボタンイベント
+            launchBtn.addEventListener('mousedown', startPowerCharge);
+            launchBtn.addEventListener('mouseup', launchBall);
+            resetBtn.addEventListener('click', resetGame);
+            
+            // キーボードイベント
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    if (!isChargingPower) {
+                        startPowerCharge();
+                    }
+                }
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    launchBall();
+                }
+            });
+        }
+
+        // パワーチャージ開始
+        function startPowerCharge() {
+            if (ballCount <= 0) return;
+            isChargingPower = true;
+        }
+
+        // ボール発射（発射レーンを上昇してから物理挙動に切り替え）
+        function launchBall() {
+            if (!isChargingPower || ballCount <= 0) return;
+            isChargingPower = false;
+            ballCount--;
+            // 発射レーンのスタート位置
+            const startX = canvas.width - 30;
+            const startY = canvas.height - 40;
+            const endY = 40;
+            const ball = {
+                x: startX,
+                y: startY,
+                vx: 0,
+                vy: 0,
+                radius: 8,
+                color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+                launching: true,
+                launchPower: power
+            };
+            balls.push(ball);
+            updateDisplay();
+            showLaunchEffect(ball.x, ball.y);
+        }
+
+        // 発射エフェクト
+        function showLaunchEffect(x, y) {
+            const effectLayer = document.getElementById('effectLayer');
+            for (let i = 0; i < 18; i++) {
+                const p = document.createElement('div');
+                const angle = (i / 18) * Math.PI * 2;
+                const px = x + Math.cos(angle) * 12;
+                const py = y + Math.sin(angle) * 12;
+                p.style.position = 'absolute';
+                p.style.left = (canvas.getBoundingClientRect().left + px - 4) + 'px';
+                p.style.top = (canvas.getBoundingClientRect().top + py - 4) + 'px';
+                p.style.width = '8px';
+                p.style.height = '8px';
+                p.style.borderRadius = '50%';
+                p.style.background = `linear-gradient(45deg, #FFD700, #FF8E53)`;
+                p.style.opacity = '0.8';
+                p.style.pointerEvents = 'none';
+                p.style.zIndex = '100';
+                p.style.transition = 'all 0.7s cubic-bezier(.4,2,.6,1)';
+                setTimeout(() => {
+                    p.style.left = (canvas.getBoundingClientRect().left + x + Math.cos(angle) * 60 - 4) + 'px';
+                    p.style.top = (canvas.getBoundingClientRect().top + y + Math.sin(angle) * 60 - 4) + 'px';
+                    p.style.opacity = '0';
+                }, 10);
+                setTimeout(() => effectLayer.removeChild(p), 800);
+                effectLayer.appendChild(p);
+            }
+        }
+
+        // パワー更新
+        function updatePower() {
+            if (isChargingPower) {
+                power += powerDirection * 3;
+                if (power >= 150) {
+                    power = 150;
+                    powerDirection = -1;
+                } else if (power <= 10) {
+                    power = 10;
+                    powerDirection = 1;
+                }
+                
+                const powerFill = document.getElementById('powerFill');
+                powerFill.style.width = (power / 150) * 100 + '%';
+            }
+        }
+
+        // ゲームオーバーダイアログ表示済みフラグ
+        let gameOverDialogShown = false;
+        // ボール更新
+        function updateBalls() {
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const ball = balls[i];
+                // 発射レーン上昇中
+                if (ball.launching) {
+                    // 上昇アニメーション
+                    ball.y -= 12 + (ball.launchPower / 10);
+                    if (ball.y <= 40) {
+                        ball.y = 40;
+                        // 上まで到達したら物理挙動に切り替え
+                        ball.launching = false;
+                        // ここで初めて物理速度を与える
+                        ball.vx = -1 - (ball.launchPower / 150) * 4;
+                        ball.vy = -2 - (ball.launchPower / 150) * 6;
+                    }
+                    continue;
+                }
+                // ...existing code...
+                // 重力と空気抵抗
+                ball.vy += 0.3;
+                ball.vx *= 0.999;
+                // 位置更新
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+                // 壁との衝突
+                if (ball.x - ball.radius <= 0 || ball.x + ball.radius >= canvas.width) {
+                    ball.vx *= -0.7;
+                    ball.x = Math.max(ball.radius, Math.min(canvas.width - ball.radius, ball.x));
+                    showWallEffect(ball.x, ball.y);
+                }
+                // 障害物との衝突
+                obstacles.forEach(obstacle => {
+                    const dx = ball.x - obstacle.x;
+                    const dy = ball.y - obstacle.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < ball.radius + obstacle.radius) {
+                        // 法線ベクトル
+                        const nx = dx / distance;
+                        const ny = dy / distance;
+                        // 接線ベクトル
+                        const tx = -ny;
+                        const ty = nx;
+                        // 速度ベクトルを法線・接線成分に分解
+                        const v_n = ball.vx * nx + ball.vy * ny;
+                        const v_t = ball.vx * tx + ball.vy * ty;
+                        // 反射係数
+                        const restitution = 0.7;
+                        // 法線成分を反転＋減衰、接線成分はそのまま
+                        const v_n_after = -v_n * restitution;
+                        // 合成して新しい速度に
+                        ball.vx = v_n_after * nx + v_t * tx;
+                        ball.vy = v_n_after * ny + v_t * ty;
+                        // ボールを障害物から離す
+                        const overlap = ball.radius + obstacle.radius - distance;
+                        ball.x += nx * overlap;
+                        ball.y += ny * overlap;
+                        showObstacleEffect(obstacle.x, obstacle.y);
+                    }
+                });
+                // ポケットとの衝突
+                pockets.forEach(pocket => {
+                    if (ball.x > pocket.x && 
+                        ball.x < pocket.x + pocket.width &&
+                        ball.y > pocket.y && 
+                        ball.y < pocket.y + pocket.height) {
+                        score += pocket.points;
+                        balls.splice(i, 1);
+                        updateDisplay();
+                        showScoreEffect(pocket.x + pocket.width/2, pocket.y + pocket.height/2, pocket.points);
+                        return;
+                    }
+                });
+                // 画面下から消えたボールを削除
+                if (ball.y > canvas.height + 50) {
+                    balls.splice(i, 1);
+                }
+            }
+            // ゲームオーバー判定
+            if (ballCount <= 0 && balls.length === 0 && !gameOverDialogShown) {
+                showGameOverDialog(score);
+                gameOverDialogShown = true;
+            }
+        }
+
+        // 壁エフェクト
+        function showWallEffect(x, y) {
+            const effectLayer = document.getElementById('effectLayer');
+            const p = document.createElement('div');
+            p.style.position = 'absolute';
+            p.style.left = (canvas.getBoundingClientRect().left + x - 8) + 'px';
+            p.style.top = (canvas.getBoundingClientRect().top + y - 8) + 'px';
+            p.style.width = '16px';
+            p.style.height = '16px';
+            p.style.borderRadius = '50%';
+            p.style.background = 'radial-gradient(circle, #fff 0%, #FFD700 60%, transparent 100%)';
+            p.style.opacity = '0.7';
+            p.style.pointerEvents = 'none';
+            p.style.zIndex = '100';
+            p.style.transition = 'all 0.5s cubic-bezier(.4,2,.6,1)';
+            setTimeout(() => {
+                p.style.opacity = '0';
+                p.style.transform = 'scale(2)';
+            }, 10);
+            setTimeout(() => effectLayer.removeChild(p), 600);
+            effectLayer.appendChild(p);
+        }
+        // 釘エフェクト
+        function showObstacleEffect(x, y) {
+            const effectLayer = document.getElementById('effectLayer');
+            for (let i = 0; i < 8; i++) {
+                const p = document.createElement('div');
+                const angle = (i / 8) * Math.PI * 2;
+                const px = x + Math.cos(angle) * 2;
+                const py = y + Math.sin(angle) * 2;
+                p.style.position = 'absolute';
+                p.style.left = (canvas.getBoundingClientRect().left + px - 2) + 'px';
+                p.style.top = (canvas.getBoundingClientRect().top + py - 2) + 'px';
+                p.style.width = '4px';
+                p.style.height = '4px';
+                p.style.borderRadius = '50%';
+                p.style.background = 'linear-gradient(45deg, #FFD700, #fff)';
+                p.style.opacity = '0.7';
+                p.style.pointerEvents = 'none';
+                p.style.zIndex = '100';
+                p.style.transition = 'all 0.5s cubic-bezier(.4,2,.6,1)';
+                setTimeout(() => {
+                    p.style.left = (canvas.getBoundingClientRect().left + x + Math.cos(angle) * 18 - 2) + 'px';
+                    p.style.top = (canvas.getBoundingClientRect().top + y + Math.sin(angle) * 18 - 2) + 'px';
+                    p.style.opacity = '0';
+                }, 10);
+                setTimeout(() => effectLayer.removeChild(p), 600);
+                effectLayer.appendChild(p);
+            }
+        }
+        // 得点エフェクト
+        function showScoreEffect(x, y, points) {
+            const effectLayer = document.getElementById('effectLayer');
+            const p = document.createElement('div');
+            p.textContent = `+${points}`;
+            p.style.position = 'absolute';
+            p.style.left = (canvas.getBoundingClientRect().left + x - 18) + 'px';
+            p.style.top = (canvas.getBoundingClientRect().top + y - 18) + 'px';
+            p.style.fontSize = '28px';
+            p.style.fontWeight = 'bold';
+            p.style.color = '#FFD700';
+            p.style.textShadow = '0 0 8px #fff, 0 0 16px #FFD700';
+            p.style.opacity = '1';
+            p.style.pointerEvents = 'none';
+            p.style.zIndex = '200';
+            p.style.transition = 'all 0.8s cubic-bezier(.4,2,.6,1)';
+            setTimeout(() => {
+                p.style.top = (canvas.getBoundingClientRect().top + y - 60) + 'px';
+                p.style.opacity = '0';
+            }, 10);
+            setTimeout(() => effectLayer.removeChild(p), 900);
+            effectLayer.appendChild(p);
+        }
+
+        // 描画
+        function draw() {
+            // 背景をクリア
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // 発射台装飾
+            ctx.save();
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.beginPath();
+            ctx.ellipse(canvas.width - 30, canvas.height - 30, 18, 10, 0, 0, Math.PI * 2);
+            ctx.shadowColor = '#FFD700';
+            ctx.shadowBlur = 12;
+            ctx.fill();
+            ctx.restore();
+            // 障害物を描画
+            ctx.fillStyle = '#8B4513';
+            obstacles.forEach(obstacle => {
+                ctx.beginPath();
+                ctx.arc(obstacle.x, obstacle.y, obstacle.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            // ポケットを描画
+            pockets.forEach(pocket => {
+                ctx.fillStyle = '#FFD700';
+                ctx.fillRect(pocket.x, pocket.y, pocket.width, pocket.height);
+                // 得点表示
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(pocket.points + 'pt', 
+                    pocket.x + pocket.width/2, 
+                    pocket.y + pocket.height/2 + 4);
+            });
+            // ボールを描画
+            balls.forEach(ball => {
+                ctx.fillStyle = ball.color;
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fill();
+                // 光沢効果
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.arc(ball.x - 2, ball.y - 2, ball.radius * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // 表示更新
+        function updateDisplay() {
+            const ballCountElem = document.getElementById('ballCount');
+            const scoreElem = document.getElementById('score');
+            ballCountElem.textContent = ballCount;
+            scoreElem.textContent = score;
+            // アニメーション
+            ballCountElem.animate([
+                { transform: 'scale(1)', color: '#fff' },
+                { transform: 'scale(1.3)', color: '#FFD700' },
+                { transform: 'scale(1)', color: '#fff' }
+            ], { duration: 400 });
+            scoreElem.animate([
+                { transform: 'scale(1)', color: '#fff' },
+                { transform: 'scale(1.3)', color: '#FFD700' },
+                { transform: 'scale(1)', color: '#fff' }
+            ], { duration: 400 });
+            const launchBtn = document.getElementById('launchBtn');
+            launchBtn.disabled = ballCount <= 0;
+        }
+
+        // ゲームオーバー演出
+        function showGameOverDialog(finalScore) {
+            const effectLayer = document.getElementById('effectLayer');
+            // pointer-eventsを有効化
+            effectLayer.style.pointerEvents = 'auto';
+            // 既存のダイアログがあれば削除
+            const oldDialog = document.getElementById('gameOverDialog');
+            if (oldDialog && oldDialog.parentNode) oldDialog.parentNode.removeChild(oldDialog);
+            const dialog = document.createElement('div');
+            dialog.id = 'gameOverDialog';
+            dialog.style.position = 'fixed';
+            dialog.style.left = '50%';
+            dialog.style.top = '50%';
+            dialog.style.transform = 'translate(-50%,-50%) scale(0.8)';
+            dialog.style.background = 'linear-gradient(135deg, #fff8, #FFD700cc 80%)';
+            dialog.style.border = '4px solid #FFD700';
+            dialog.style.borderRadius = '24px';
+            dialog.style.boxShadow = '0 0 32px #FFD700cc, 0 0 64px #fff8';
+            dialog.style.padding = '40px 32px 32px 32px';
+            dialog.style.textAlign = 'center';
+            dialog.style.zIndex = '9999';
+            dialog.style.fontSize = '28px';
+            dialog.style.fontWeight = 'bold';
+            dialog.style.color = '#B8860B';
+            dialog.style.textShadow = '0 0 8px #fff, 0 0 16px #FFD700';
+            dialog.innerHTML = `<div style=\"font-size:36px; margin-bottom:16px;\">🎉 ゲーム終了！ 🎉</div><div style=\"margin-bottom:12px;\">最終スコア: <span style='color:#FF8E53;'>${finalScore}</span></div><button id='closeGameOverBtn' style='margin-top:18px;font-size:22px;padding:10px 32px;background:linear-gradient(45deg,#FFD700,#FF8E53);color:#fff;border:none;border-radius:18px;box-shadow:0 0 16px #FFD700;pointer-events:auto;'>閉じる</button>`;
+            effectLayer.appendChild(dialog);
+            setTimeout(() => { dialog.style.transform = 'translate(-50%,-50%) scale(1)'; }, 30);
+            document.getElementById('closeGameOverBtn').onclick = () => {
+                if (dialog.parentNode) dialog.parentNode.removeChild(dialog);
+                effectLayer.style.pointerEvents = 'none';
+                // gameOverDialogShownはtrueのまま（閉じるボタンでfalseにしない）
+            };
+            // 花火エフェクト
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => showFirework(200 + i*80, 200 + Math.random()*100), i*400);
+            }
+        }
+        // 花火エフェクト
+        function showFirework(cx, cy) {
+            const effectLayer = document.getElementById('effectLayer');
+            for (let i = 0; i < 24; i++) {
+                const p = document.createElement('div');
+                const angle = (i / 24) * Math.PI * 2;
+                const px = cx + Math.cos(angle) * 8;
+                const py = cy + Math.sin(angle) * 8;
+                p.style.position = 'absolute';
+                p.style.left = (px) + 'px';
+                p.style.top = (py) + 'px';
+                p.style.width = '10px';
+                p.style.height = '10px';
+                p.style.borderRadius = '50%';
+                p.style.background = `linear-gradient(45deg, #FFD700, #FF8E53, #fff)`;
+                p.style.opacity = '0.9';
+                p.style.pointerEvents = 'none';
+                p.style.zIndex = '10000';
+                p.style.transition = 'all 1.2s cubic-bezier(.4,2,.6,1)';
+                setTimeout(() => {
+                    p.style.left = (cx + Math.cos(angle) * 80) + 'px';
+                    p.style.top = (cy + Math.sin(angle) * 80) + 'px';
+                    p.style.opacity = '0';
+                }, 10);
+                setTimeout(() => effectLayer.removeChild(p), 1300);
+                effectLayer.appendChild(p);
+            }
+        }
+
+        // ゲームリセット
+        function resetGame() {
+            balls = [];
+            score = 0;
+            ballCount = 10;
+            power = 50;
+            isChargingPower = false;
+            powerDirection = 1;
+            gameOverDialogShown = false;
+            updateDisplay();
+            // ゲームオーバーダイアログがあれば消す
+            const dialog = document.getElementById('gameOverDialog');
+            const effectLayer = document.getElementById('effectLayer');
+            if (dialog && dialog.parentNode) dialog.parentNode.removeChild(dialog);
+            if (effectLayer) effectLayer.style.pointerEvents = 'none';
+            const powerFill = document.getElementById('powerFill');
+            powerFill.style.width = '33.3%';
+        }
+
+        // ゲームループ
+        function gameLoop() {
+            if (!gameRunning) return;
+            
+            updatePower();
+            updateBalls();
+            draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ゲーム開始
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
