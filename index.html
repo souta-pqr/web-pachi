@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Pachi</title>
+    <title>Web Pachi Ultimate</title>
     <style>
         body {
             margin: 0;
@@ -59,6 +59,19 @@
             max-width: 440px;
             position: relative;
             border: 3px solid #FFD700;
+            transition: transform 0.1s ease;
+        }
+        
+        /* 画面シェイクアニメーション */
+        .shake {
+            animation: screen-shake 0.3s ease-in-out;
+        }
+        
+        @keyframes screen-shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-2px) translateY(1px); }
+            50% { transform: translateX(2px) translateY(-1px); }
+            75% { transform: translateX(-1px) translateY(2px); }
         }
         
         /* ゲーム領域装飾ライト */
@@ -101,11 +114,6 @@
             text-shadow: 0 0 8px #FF6B6B;
             margin-bottom: 10px;
             transition: all 0.3s;
-        }
-        
-        @keyframes info-glow {
-            0% { text-shadow: 0 0 8px #FFD700, 0 0 16px #fff; }
-            100% { text-shadow: 0 0 16px #FFD700, 0 0 32px #fff; }
         }
         
         canvas {
@@ -158,22 +166,6 @@
             100% { opacity: 1; transform: scale(1.2); }
         }
         
-        .controls-row {
-            margin-top: 10px;
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-        }
-        
-        .button-group {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: flex-end;
-        }
-        
         .power-meter {
             width: 220px;
             height: 22px;
@@ -191,10 +183,6 @@
             transition: width 0.1s;
             width: 50%;
             box-shadow: 0 0 8px #FFEB3B, 0 0 16px #FF5722;
-        }
-        @keyframes power-glow {
-            0% { box-shadow: 0 0 12px #FFEB3B, 0 0 24px #FF5722; }
-            100% { box-shadow: 0 0 24px #FFEB3B, 0 0 48px #FF5722; }
         }
         
         button {
@@ -243,10 +231,6 @@
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.1); }
-        }
-        
-        .instructions {
-            display: none;
         }
 
         /* サイド装飾 */
@@ -427,12 +411,6 @@
             }
         }
         
-        @keyframes wave-light {
-            0% { opacity: 0.3; }
-            50% { opacity: 1; }
-            100% { opacity: 0.3; }
-        }
-        
         /* 全体ライトアップ */
         .stage-clear-lighting {
             position: fixed;
@@ -481,6 +459,73 @@
             gap: 10px;
             align-items: flex-end;
         }
+        
+        /* 新機能UI */
+        .feature-indicator {
+            position: fixed;
+            left: 140px;
+            bottom: 40px;
+            z-index: 10010;
+            background: linear-gradient(135deg, #232526cc 0%, #FFD70033 100%);
+            border-radius: 18px;
+            box-shadow: 0 4px 24px #FFD70033, 0 1.5px 6px #0002;
+            padding: 12px 16px;
+            font-size: 14px;
+            color: #FFD700;
+            text-shadow: 0 0 8px #FFD700;
+            max-width: 200px;
+        }
+        
+        .achievement-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: linear-gradient(135deg, #FFD700, #FF8E53);
+            color: #fff;
+            padding: 20px 30px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 18px;
+            text-align: center;
+            z-index: 10000;
+            box-shadow: 0 0 30px #FFD700;
+            transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        
+        .achievement-popup.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        .bonus-mode-indicator {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(45deg, #FF1493, #00FFFF);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 20px;
+            text-align: center;
+            z-index: 10000;
+            box-shadow: 0 0 20px #FF1493;
+            animation: bonus-pulse 0.8s infinite alternate;
+            opacity: 0;
+            transform: translateX(-50%) translateY(-20px);
+            transition: all 0.3s ease;
+        }
+        
+        .bonus-mode-indicator.active {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        @keyframes bonus-pulse {
+            0% { box-shadow: 0 0 20px #FF1493; }
+            100% { box-shadow: 0 0 30px #FF1493, 0 0 40px #00FFFF; }
+        }
     </style>
 </head>
 <body>
@@ -500,7 +545,7 @@
         <div class="led-strip" id="rightLedStrip">
             <!-- LEDライトはJavaScriptで動的生成 -->
         </div>
-        <div class="neon-sign">JACKPOT</div>
+        <div class="neon-sign">ULTIMATE</div>
     </div>
     
     <!-- 全体ライトアップ -->
@@ -510,11 +555,21 @@
     <div class="global-status" style="position:fixed;top:24px;right:120px;z-index:10001;text-align:right;min-width:180px;">
         <div class="stage-info" id="stageInfo" style="color:#FFD700;font-weight:bold;font-size:18px;text-shadow:0 0 8px #FFD700,0 0 16px #fff;">ステージ: <b>1</b> ／ 目標スコア: <b>350</b></div>
         <div class="combo-info" id="comboInfo" style="color:#FF6B6B;font-size:18px;font-weight:bold;text-shadow:0 0 8px #FF6B6B;">コンボ: 0 (×1.0)</div>
+        <div class="highscore-info" id="highscoreInfo" style="color:#00FFFF;font-size:14px;font-weight:bold;text-shadow:0 0 8px #00FFFF;margin-top:5px;">ハイスコア: 0</div>
     </div>
 
-    <div class="game-container">
+    <!-- ボーナスモード表示 -->
+    <div class="bonus-mode-indicator" id="bonusModeIndicator">🔥 FEVER TIME 🔥</div>
+
+    <!-- アチーブメント通知 -->
+    <div class="achievement-popup" id="achievementPopup">
+        <div>🏆 アチーブメント達成！</div>
+        <div id="achievementText"></div>
+    </div>
+
+    <div class="game-container" id="gameContainer">
         <div class="game-border-lights"></div>
-        <h1 style="color: #FFD700; margin-bottom: 20px;">Web Pachi</h1>
+        <h1 style="color: #FFD700; margin-bottom: 20px;">Web Pachi Ultimate</h1>
 
         <div class="game-info">
             <span>玉数: <span id="ballCount">10</span></span>
@@ -556,11 +611,17 @@
         </div>
     </div>
 
+    <!-- 機能表示 -->
+    <div class="feature-indicator" id="featureIndicator">
+        💫 マルチボール待機<br>
+        ⚡ パワーゾーン: OFF<br>
+        🎯 Moving Nails: ON
+    </div>
+
     <script>
         // ゲーム状態
         let canvas, ctx;
         let balls = [];
-        let ballTrails = []; // ボールの軌跡
         let obstacles = [];
         let pockets = [];
         let score = 0;
@@ -573,24 +634,35 @@
         let targetScore = 350;
         let ballsPerStage = 10;
         let ballsBonus = 3;
+        let highScore = parseInt(localStorage.getItem('webPachiHighScore') || '0');
         
-        // 新機能
+        // 既存機能
         let combo = 0;
         let comboMultiplier = 1.0;
         let ballsLaunched = 0;
-        let isSpecialBallReady = false;
+        
+        // 新機能
+        let multiballActive = false;
+        let powerZoneActive = false;
+        let powerZoneTimer = 0;
+        let bonusModeActive = false;
+        let bonusModeTimer = 0;
+        let movingNails = true;
+        let achievements = [];
         
         // ライト制御
         let leftLeds = [];
         let rightLeds = [];
         let lightingAnimationId = null;
-        let idleShowId = null;
-        let shootingStarId = null;
-        
-        // パフォーマンス最適化用
         let frameCount = 0;
         let lastLightUpdate = 0;
         let lastShootingStarCreate = 0;
+
+        // パワーゾーン（特殊エリア）
+        let powerZones = [
+            { x: 100, y: 200, width: 80, height: 30, type: 'speed' },
+            { x: 220, y: 150, width: 80, height: 30, type: 'multiball' }
+        ];
 
         // 初期化
         function init() {
@@ -603,12 +675,14 @@
             setupLEDs();
             startBackgroundEffects();
             updateComboDisplay();
+            updateHighScore();
+            loadAchievements();
             
             gameRunning = true;
             gameLoop();
         }
 
-        // 障害物（釘）の配置
+        // 障害物（釘）の配置 - 動く釘を含む
         function setupObstacles() {
             const rows = 6;
             const cols = 5;
@@ -620,7 +694,12 @@
                         obstacles.push({
                             x: x,
                             y: y,
-                            radius: 4
+                            originalX: x,
+                            originalY: y,
+                            radius: 4,
+                            moving: Math.random() < 0.3, // 30%の確率で動く
+                            moveSpeed: 0.5 + Math.random() * 1,
+                            movePhase: Math.random() * Math.PI * 2
                         });
                     }
                 }
@@ -630,9 +709,11 @@
         // ポケット（得点穴）の配置
         function setupPockets() {
             pockets.push(
-                { x: 50, y: canvas.height - 80, width: 60, height: 20, points: 100 },
-                { x: 170, y: canvas.height - 100, width: 60, height: 20, points: 50 },
-                { x: 290, y: canvas.height - 80, width: 60, height: 20, points: 100 }
+                { x: 50, y: canvas.height - 80, width: 60, height: 20, points: 100, type: 'normal' },
+                { x: 170, y: canvas.height - 100, width: 60, height: 20, points: 50, type: 'normal' },
+                { x: 290, y: canvas.height - 80, width: 60, height: 20, points: 100, type: 'normal' },
+                // ボーナスポケット
+                { x: 150, y: canvas.height - 50, width: 100, height: 15, points: 500, type: 'bonus' }
             );
         }
         
@@ -641,7 +722,7 @@
             const leftStrip = document.getElementById('leftLedStrip');
             const rightStrip = document.getElementById('rightLedStrip');
             
-            // 左側LED（20個に削減）
+            // 左側LED（20個）
             for (let i = 0; i < 20; i++) {
                 const led = document.createElement('div');
                 led.className = 'led';
@@ -649,7 +730,7 @@
                 leftLeds.push(led);
             }
             
-            // 右側LED（20個に削減）
+            // 右側LED（20個）
             for (let i = 0; i < 20; i++) {
                 const led = document.createElement('div');
                 led.className = 'led';
@@ -658,23 +739,31 @@
             }
         }
         
-        // 統合アニメーションシステム（最適化済み）
+        // 統合アニメーションシステム
         function startOptimizedAnimations() {
             function animationLoop() {
                 frameCount++;
                 const now = Date.now();
                 
-                // LEDライトの更新（60fps → 15fps）
+                // LEDライトの更新
                 if (now - lastLightUpdate > 66) {
                     updateAllLights();
                     lastLightUpdate = now;
                 }
                 
-                // 流星生成（2秒間隔 → 4秒間隔）
+                // 流星生成
                 if (now - lastShootingStarCreate > 4000) {
                     createSingleShootingStar();
                     lastShootingStarCreate = now;
                 }
+                
+                // 動く釘の更新
+                if (movingNails) {
+                    updateMovingObstacles();
+                }
+                
+                // ボーナスモード管理
+                updateBonusMode();
                 
                 lightingAnimationId = requestAnimationFrame(animationLoop);
             }
@@ -682,7 +771,43 @@
             animationLoop();
         }
         
-        // LEDライト統合更新（最適化済み）
+        // 動く釘の更新
+        function updateMovingObstacles() {
+            obstacles.forEach(obstacle => {
+                if (obstacle.moving) {
+                    obstacle.movePhase += obstacle.moveSpeed * 0.02;
+                    obstacle.x = obstacle.originalX + Math.sin(obstacle.movePhase) * 15;
+                    obstacle.y = obstacle.originalY + Math.cos(obstacle.movePhase * 0.7) * 8;
+                }
+            });
+        }
+        
+        // ボーナスモード管理（改良版）
+        function updateBonusMode() {
+            if (bonusModeActive) {
+                bonusModeTimer--;
+                // タイマー表示更新（残り時間表示）
+                const indicator = document.getElementById('bonusModeIndicator');
+                if (bonusModeTimer > 0) {
+                    const secondsLeft = Math.ceil(bonusModeTimer / 60);
+                    indicator.textContent = `🔥 FEVER TIME ${secondsLeft}s 🔥`;
+                }
+                
+                if (bonusModeTimer <= 0) {
+                    deactivateBonusMode();
+                }
+            }
+            
+            if (powerZoneActive) {
+                powerZoneTimer--;
+                if (powerZoneTimer <= 0) {
+                    powerZoneActive = false;
+                    updateFeatureIndicator();
+                }
+            }
+        }
+        
+        // LEDライト統合更新
         function updateAllLights() {
             // スコアライト更新
             const scoreRatio = Math.min(score / targetScore, 1);
@@ -696,28 +821,49 @@
                     led.classList.toggle('active', shouldBeActive);
                 }
                 
-                // アイドル時の波エフェクト（軽量化）
-                if (ballCount > 0 && balls.length === 0 && !shouldBeActive) {
-                    const wave = Math.sin((frameCount * 0.05 + i * 0.3));
-                    led.style.opacity = 0.3 + wave * 0.1;
+                // ボーナスモード時は特殊エフェクトを制限（競合回避）
+                if (bonusModeActive) {
+                    // ボーナス中は基本的なアイドルエフェクトのみ
+                    if (!shouldBeActive && !led.classList.contains('jackpot')) {
+                        const wave = Math.sin((frameCount * 0.08 + i * 0.2));
+                        led.style.opacity = 0.4 + wave * 0.2;
+                    }
+                } else {
+                    // 通常時のアイドルエフェクト
+                    if (ballCount > 0 && balls.length === 0 && !shouldBeActive) {
+                        const wave = Math.sin((frameCount * 0.05 + i * 0.3));
+                        led.style.opacity = 0.3 + wave * 0.1;
+                    }
+                    led.classList.remove('rainbow'); // ボーナス終了時にクリーンアップ
                 }
             });
             
             // コンボライト更新
             rightLeds.forEach((led, i) => {
-                led.classList.remove('combo', 'special');
-                
-                if (combo > 0) {
-                    const comboLeds = Math.min(combo, 20);
-                    if (i < comboLeds) {
-                        led.classList.add(combo >= 5 ? 'special' : 'combo');
+                // ボーナス中でない場合のみコンボクラスを変更
+                if (!bonusModeActive) {
+                    led.classList.remove('combo', 'special');
+                    
+                    if (combo > 0) {
+                        const comboLeds = Math.min(combo, 20);
+                        if (i < comboLeds) {
+                            led.classList.add(combo >= 5 ? 'special' : 'combo');
+                        }
                     }
                 }
                 
-                // アイドル時のエフェクト（軽量化）
-                if (ballCount > 0 && balls.length === 0 && combo === 0) {
-                    const wave = Math.sin((frameCount * 0.05 + i * 0.3 + Math.PI));
-                    led.style.opacity = 0.3 + wave * 0.1;
+                // マルチボール時のエフェクト（ボーナス中は制限）
+                if (multiballActive && combo === 0 && !bonusModeActive) {
+                    const wave = Math.sin((frameCount * 0.08 + i * 0.4 + Math.PI));
+                    led.style.opacity = 0.4 + wave * 0.2;
+                    led.classList.add('wave');
+                } else if (!multiballActive || bonusModeActive) {
+                    led.classList.remove('wave');
+                    // 通常時のアイドルエフェクト
+                    if (ballCount > 0 && balls.length === 0 && combo === 0 && !bonusModeActive) {
+                        const wave = Math.sin((frameCount * 0.05 + i * 0.3 + Math.PI));
+                        led.style.opacity = 0.3 + wave * 0.1;
+                    }
                 }
             });
         }
@@ -725,7 +871,7 @@
         // 軽量化された流星生成
         function createSingleShootingStar() {
             const container = document.getElementById('shootingStars');
-            if (container.children.length > 5) return; // 最大5個まで
+            if (container.children.length > 5) return;
             
             const star = document.createElement('div');
             star.className = 'shooting-star';
@@ -740,7 +886,7 @@
             }, 3000);
         }
         
-        // 背景エフェクト開始（軽量化）
+        // 背景エフェクト開始
         function startBackgroundEffects() {
             startOptimizedAnimations();
         }
@@ -779,8 +925,6 @@
 
         // 特殊ボールの判定
         function getSpecialBallType() {
-            // ballsLaunchedは「今から発射するボールが何発目か」を示す
-            // 10発目がゴールデン、5発目がレインボー
             const next = ballsLaunched + 1;
             if (next % 10 === 0) {
                 return 'golden';
@@ -791,7 +935,7 @@
             return 'normal';
         }
 
-        // ボール発射
+        // ボール発射（マルチボール対応）
         function launchBall() {
             if (!isChargingPower || ballCount <= 0) return;
             isChargingPower = false;
@@ -801,19 +945,22 @@
             const startY = canvas.height - 40;
             const specialType = getSpecialBallType();
             
-            const ball = {
-                x: startX,
-                y: startY,
-                vx: 0,
-                vy: 0,
-                radius: 8,
-                color: getBallColor(specialType),
-                launching: true,
-                launchPower: power,
-                specialType: specialType,
-                trail: [] // 軌跡
-            };
+            // メインボール
+            const ball = createBall(startX, startY, specialType, power);
             balls.push(ball);
+            
+            // マルチボールチェック
+            if (multiballActive || specialType === 'golden') {
+                // 追加ボール（左右に少しずらして発射）
+                setTimeout(() => {
+                    const ball2 = createBall(startX - 10, startY, 'normal', power * 0.8);
+                    const ball3 = createBall(startX + 10, startY, 'normal', power * 0.8);
+                    balls.push(ball2, ball3);
+                }, 100);
+                multiballActive = false;
+                updateFeatureIndicator();
+            }
+            
             ballsLaunched++;
             
             // 特殊ボールのライト演出
@@ -824,6 +971,24 @@
             updateDisplay();
             updateSpecialBallIndicator();
             showLaunchEffect(ball.x, ball.y, specialType);
+        }
+
+        // ボール作成関数
+        function createBall(x, y, specialType, launchPower) {
+            return {
+                x: x,
+                y: y,
+                vx: 0,
+                vy: 0,
+                radius: 8,
+                color: getBallColor(specialType),
+                launching: true,
+                launchPower: launchPower,
+                specialType: specialType,
+                trail: [],
+                energy: specialType === 'golden' ? 2.0 : 1.0, // エネルギー値
+                magnetism: false // 磁気効果
+            };
         }
 
         // ボールの色を取得
@@ -843,7 +1008,11 @@
             const indicator = document.getElementById('specialBallIndicator');
             const next = ballsLaunched + 1;
             const nextSpecial = 10 - ((next - 1) % 10);
-            if (nextSpecial === 1) {
+            
+            if (multiballActive) {
+                indicator.textContent = '💫 マルチボール準備完了！ 💫';
+                indicator.classList.add('active');
+            } else if (nextSpecial === 1) {
                 indicator.textContent = '⭐ 次はゴールデンボール！ ⭐';
                 indicator.classList.add('active');
             } else if (nextSpecial <= 4) {
@@ -854,51 +1023,11 @@
             }
         }
 
-        // 発射エフェクト（軽量化）
-        function showLaunchEffect(x, y, specialType) {
-            const effectLayer = document.getElementById('effectLayer');
-            const particleCount = specialType === 'golden' || specialType === 'rainbow' ? 12 : 8; // 粒子数を削減
-            
-            for (let i = 0; i < particleCount; i++) {
-                const p = document.createElement('div');
-                const angle = (i / particleCount) * Math.PI * 2;
-                const px = x + Math.cos(angle) * 12;
-                const py = y + Math.sin(angle) * 12;
-                p.style.position = 'absolute';
-                p.style.left = (canvas.getBoundingClientRect().left + px - 4) + 'px';
-                p.style.top = (canvas.getBoundingClientRect().top + py - 4) + 'px';
-                p.style.width = '6px'; // サイズ縮小
-                p.style.height = '6px';
-                p.style.borderRadius = '50%';
-                
-                if (specialType === 'golden') {
-                    p.style.background = `linear-gradient(45deg, #FFD700, #FFA500)`;
-                    p.style.boxShadow = '0 0 6px #FFD700';
-                } else if (specialType === 'rainbow') {
-                    p.style.background = `linear-gradient(45deg, hsl(${i * 30}, 100%, 60%), hsl(${(i * 30 + 60) % 360}, 100%, 60%))`;
-                    p.style.boxShadow = '0 0 6px rgba(255,255,255,0.8)';
-                } else {
-                    p.style.background = `linear-gradient(45deg, #FFD700, #FF8E53)`;
-                }
-                
-                p.style.opacity = '0.8';
-                p.style.pointerEvents = 'none';
-                p.style.zIndex = '100';
-                p.style.transition = 'all 0.5s ease-out'; // 短縮
-                setTimeout(() => {
-                    p.style.left = (canvas.getBoundingClientRect().left + x + Math.cos(angle) * 40 - 4) + 'px';
-                    p.style.top = (canvas.getBoundingClientRect().top + y + Math.sin(angle) * 40 - 4) + 'px';
-                    p.style.opacity = '0';
-                }, 10);
-                setTimeout(() => effectLayer.removeChild(p), 600);
-                effectLayer.appendChild(p);
-            }
-        }
-
         // パワー更新
         function updatePower() {
             if (isChargingPower) {
-                power += powerDirection * 3;
+                const speedMultiplier = bonusModeActive ? 2 : 1;
+                power += powerDirection * 3 * speedMultiplier;
                 if (power >= 150) {
                     power = 150;
                     powerDirection = -1;
@@ -909,26 +1038,119 @@
                 
                 const powerFill = document.getElementById('powerFill');
                 powerFill.style.width = (power / 150) * 100 + '%';
+                
+                // ボーナス時のエフェクト
+                if (bonusModeActive) {
+                    powerFill.style.boxShadow = '0 0 15px #FF1493, 0 0 25px #FF1493';
+                } else {
+                    powerFill.style.boxShadow = '0 0 8px #FFEB3B, 0 0 16px #FF5722';
+                }
             }
         }
 
-        // コンボ更新（最適化済み）
+        // コンボ更新（改良版）
         function updateCombo(success) {
             if (success) {
                 combo++;
                 comboMultiplier = 1.0 + (combo * 0.2);
                 
-                // 高コンボ時の特殊演出
+                // 高コンボ時の特殊演出と機能開放（タイミング調整）
                 if (combo === 10) {
+                    // ボーナスモード開始前にジャックポット演出
                     triggerJackpotLights();
+                    // 少し遅らせてボーナスモード開始
+                    setTimeout(() => {
+                        activateBonusMode();
+                        checkAchievement('combo_master');
+                    }, 500);
                 } else if (combo === 5) {
                     triggerRainbowShow();
+                    setTimeout(() => {
+                        multiballActive = true;
+                        updateFeatureIndicator();
+                        checkAchievement('combo_streak');
+                    }, 200);
+                } else if (combo === 15) {
+                    setTimeout(() => {
+                        powerZoneActive = true;
+                        powerZoneTimer = 300; // 5秒間
+                        updateFeatureIndicator();
+                        checkAchievement('combo_legend');
+                    }, 100);
                 }
             } else {
                 combo = 0;
                 comboMultiplier = 1.0;
             }
             updateComboDisplay();
+        }
+
+        // ボーナスモード開始
+        function activateBonusMode() {
+            bonusModeActive = true;
+            bonusModeTimer = 600; // 10秒間
+            
+            // 段階的にエフェクトを実行
+            setTimeout(() => {
+                const indicator = document.getElementById('bonusModeIndicator');
+                indicator.classList.add('active');
+            }, 50);
+            
+            // LEDエフェクト（少し遅らせて実行）
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    [...leftLeds, ...rightLeds].forEach((led, i) => {
+                        setTimeout(() => {
+                            led.classList.add('jackpot');
+                        }, i * 15);
+                    });
+                });
+            }, 100);
+            
+            // 画面シェイク（エフェクト後に実行）
+            setTimeout(() => {
+                const container = document.getElementById('gameContainer');
+                container.classList.add('shake');
+                setTimeout(() => container.classList.remove('shake'), 300);
+            }, 200);
+            
+            // LEDエフェクト終了
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    [...leftLeds, ...rightLeds].forEach(led => {
+                        led.classList.remove('jackpot');
+                    });
+                });
+            }, 1000);
+        }
+
+        // ボーナスモード終了
+        function deactivateBonusMode() {
+            bonusModeActive = false;
+            const indicator = document.getElementById('bonusModeIndicator');
+            indicator.classList.remove('active');
+            
+            // LEDライトのクリーンアップ
+            requestAnimationFrame(() => {
+                [...leftLeds, ...rightLeds].forEach(led => {
+                    led.classList.remove('jackpot', 'rainbow');
+                    led.style.opacity = ''; // opacityをリセット
+                });
+            });
+            
+            // パワーメーターのエフェクトもリセット
+            const powerFill = document.getElementById('powerFill');
+            powerFill.style.boxShadow = '0 0 8px #FFEB3B, 0 0 16px #FF5722';
+        }
+
+        // 機能表示更新
+        function updateFeatureIndicator() {
+            const indicator = document.getElementById('featureIndicator');
+            indicator.innerHTML = `
+                💫 マルチボール: ${multiballActive ? 'READY' : '待機'}<br>
+                ⚡ パワーゾーン: ${powerZoneActive ? 'ACTIVE' : 'OFF'}<br>
+                🎯 Moving Nails: ${movingNails ? 'ON' : 'OFF'}
+            `;
         }
 
         // コンボ表示更新
@@ -945,22 +1167,33 @@
             }
         }
 
+        // ハイスコア更新
+        function updateHighScore() {
+            const highScoreInfo = document.getElementById('highscoreInfo');
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('webPachiHighScore', highScore.toString());
+                checkAchievement('new_record');
+            }
+            highScoreInfo.textContent = `ハイスコア: ${highScore}`;
+        }
+
         let gameOverDialogShown = false;
 
-        // ボール更新（最適化済み）
+        // ボール更新（改良版）
         function updateBalls() {
             for (let i = balls.length - 1; i >= 0; i--) {
                 const ball = balls[i];
                 
-                // 軌跡を記録（間引き）
+                // 軌跡を記録
                 if (!ball.launching && frameCount % 2 === 0) {
                     ball.trail.push({x: ball.x, y: ball.y});
-                    if (ball.trail.length > 5) { // 軌跡を短縮
+                    if (ball.trail.length > 8) {
                         ball.trail.shift();
                     }
                 }
                 
-                // レインボーボールの色更新（頻度を下げる）
+                // レインボーボールの色更新
                 if (ball.specialType === 'rainbow' && frameCount % 10 === 0) {
                     ball.color = `hsl(${Date.now() / 20 % 360}, 100%, 60%)`;
                 }
@@ -973,12 +1206,33 @@
                         ball.launching = false;
                         ball.vx = -1 - (ball.launchPower / 150) * 4;
                         ball.vy = -2 - (ball.launchPower / 150) * 6;
+                        
+                        // エネルギー適用
+                        ball.vx *= ball.energy;
+                        ball.vy *= ball.energy;
                     }
                     continue;
                 }
                 
-                // 重力と空気抵抗
-                ball.vy += 0.3;
+                // パワーゾーンとの相互作用
+                powerZones.forEach(zone => {
+                    if (ball.x > zone.x && ball.x < zone.x + zone.width &&
+                        ball.y > zone.y && ball.y < zone.y + zone.height) {
+                        
+                        if (zone.type === 'speed' && powerZoneActive) {
+                            ball.vx *= 1.2;
+                            ball.vy *= 1.2;
+                            showPowerZoneEffect(ball.x, ball.y, 'speed');
+                        } else if (zone.type === 'multiball') {
+                            multiballActive = true;
+                            updateFeatureIndicator();
+                            showPowerZoneEffect(ball.x, ball.y, 'multiball');
+                        }
+                    }
+                });
+                
+                // 重力と空気抵抗（ボーナス時は軽減）
+                ball.vy += bonusModeActive ? 0.2 : 0.3;
                 ball.vx *= 0.999;
                 ball.x += ball.vx;
                 ball.y += ball.vy;
@@ -1002,14 +1256,14 @@
                         const ty = nx;
                         const v_n = ball.vx * nx + ball.vy * ny;
                         const v_t = ball.vx * tx + ball.vy * ty;
-                        const restitution = 0.7;
+                        const restitution = bonusModeActive ? 0.9 : 0.7;
                         const v_n_after = -v_n * restitution;
                         ball.vx = v_n_after * nx + v_t * tx;
                         ball.vy = v_n_after * ny + v_t * ty;
                         const overlap = ball.radius + obstacle.radius - distance;
                         ball.x += nx * overlap;
                         ball.y += ny * overlap;
-                        // エフェクトを軽量化
+                        
                         if (frameCount % 5 === 0) {
                             showObstacleEffect(obstacle.x, obstacle.y);
                         }
@@ -1025,11 +1279,32 @@
                         
                         let points = pocket.points;
                         
+                        // ボーナスポケットの特別処理
+                        if (pocket.type === 'bonus') {
+                            points *= 2;
+                            // ボーナスモードが既に有効でない場合のみ開始
+                            if (!bonusModeActive) {
+                                setTimeout(() => {
+                                    activateBonusMode();
+                                    checkAchievement('bonus_hunter');
+                                }, 200);
+                            } else {
+                                // 既にボーナス中の場合は時間延長
+                                bonusModeTimer += 300;
+                                checkAchievement('bonus_hunter');
+                            }
+                        }
+                        
                         // 特殊ボールの得点倍率
                         if (ball.specialType === 'golden') {
                             points *= 2;
                         } else if (ball.specialType === 'rainbow') {
                             points *= 1.5;
+                        }
+                        
+                        // ボーナスモード倍率
+                        if (bonusModeActive) {
+                            points *= 3;
                         }
                         
                         // コンボ倍率適用
@@ -1039,6 +1314,15 @@
                         updateCombo(true);
                         balls.splice(i, 1);
                         updateDisplay();
+                        updateHighScore();
+                        
+                        // 大きなスコア時は画面シェイク
+                        if (points >= 1000) {
+                            const container = document.getElementById('gameContainer');
+                            container.classList.add('shake');
+                            setTimeout(() => container.classList.remove('shake'), 300);
+                        }
+                        
                         showScoreEffect(pocket.x + pocket.width/2, pocket.y + pocket.height/2, points, ball.specialType);
                         return;
                     }
@@ -1046,7 +1330,7 @@
                 
                 // 画面下から消えたボールを削除
                 if (ball.y > canvas.height + 50) {
-                    updateCombo(false); // コンボリセット
+                    updateCombo(false);
                     balls.splice(i, 1);
                 }
             }
@@ -1055,6 +1339,7 @@
             if (ballCount <= 0 && balls.length === 0 && !gameOverDialogShown) {
                 if (score >= targetScore) {
                     triggerStageClearLights();
+                    checkAchievement('stage_clear');
                     for (let i = 0; i < 3; i++) {
                         setTimeout(() => showFirework(200 + i*80, 200 + Math.random()*100), i*400);
                     }
@@ -1064,6 +1349,122 @@
                     showGameOverDialog(score);
                     gameOverDialogShown = true;
                 }
+            }
+        }
+
+        // パワーゾーンエフェクト
+        function showPowerZoneEffect(x, y, type) {
+            const effectLayer = document.getElementById('effectLayer');
+            const p = document.createElement('div');
+            p.style.position = 'absolute';
+            p.style.left = (canvas.getBoundingClientRect().left + x - 15) + 'px';
+            p.style.top = (canvas.getBoundingClientRect().top + y - 15) + 'px';
+            p.style.width = '30px';
+            p.style.height = '30px';
+            p.style.borderRadius = '50%';
+            
+            if (type === 'speed') {
+                p.style.background = 'radial-gradient(circle, #FF1493 0%, transparent 70%)';
+                p.textContent = '⚡';
+            } else {
+                p.style.background = 'radial-gradient(circle, #00FFFF 0%, transparent 70%)';
+                p.textContent = '💫';
+            }
+            
+            p.style.fontSize = '20px';
+            p.style.display = 'flex';
+            p.style.alignItems = 'center';
+            p.style.justifyContent = 'center';
+            p.style.opacity = '1';
+            p.style.pointerEvents = 'none';
+            p.style.zIndex = '200';
+            p.style.transition = 'all 0.8s ease-out';
+            
+            setTimeout(() => {
+                p.style.transform = 'scale(2)';
+                p.style.opacity = '0';
+            }, 10);
+            setTimeout(() => effectLayer.removeChild(p), 900);
+            effectLayer.appendChild(p);
+        }
+
+        // アチーブメントシステム
+        function loadAchievements() {
+            const saved = localStorage.getItem('webPachiAchievements');
+            achievements = saved ? JSON.parse(saved) : [];
+        }
+
+        function saveAchievements() {
+            localStorage.setItem('webPachiAchievements', JSON.stringify(achievements));
+        }
+
+        function checkAchievement(achievementId) {
+            if (achievements.includes(achievementId)) return;
+            
+            const achievementNames = {
+                'combo_streak': 'コンボマスター',
+                'combo_master': 'コンボキング',
+                'combo_legend': 'コンボレジェンド',
+                'new_record': 'ハイスコア更新',
+                'bonus_hunter': 'ボーナスハンター',
+                'stage_clear': 'ステージクリア',
+                'multiball_master': 'マルチボールマスター'
+            };
+            
+            achievements.push(achievementId);
+            saveAchievements();
+            showAchievementPopup(achievementNames[achievementId] || achievementId);
+        }
+
+        function showAchievementPopup(achievementName) {
+            const popup = document.getElementById('achievementPopup');
+            const text = document.getElementById('achievementText');
+            text.textContent = achievementName;
+            popup.classList.add('show');
+            
+            setTimeout(() => {
+                popup.classList.remove('show');
+            }, 3000);
+        }
+
+        // 発射エフェクト
+        function showLaunchEffect(x, y, specialType) {
+            const effectLayer = document.getElementById('effectLayer');
+            const particleCount = specialType === 'golden' || specialType === 'rainbow' ? 12 : 8;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const p = document.createElement('div');
+                const angle = (i / particleCount) * Math.PI * 2;
+                const px = x + Math.cos(angle) * 12;
+                const py = y + Math.sin(angle) * 12;
+                p.style.position = 'absolute';
+                p.style.left = (canvas.getBoundingClientRect().left + px - 4) + 'px';
+                p.style.top = (canvas.getBoundingClientRect().top + py - 4) + 'px';
+                p.style.width = '6px';
+                p.style.height = '6px';
+                p.style.borderRadius = '50%';
+                
+                if (specialType === 'golden') {
+                    p.style.background = `linear-gradient(45deg, #FFD700, #FFA500)`;
+                    p.style.boxShadow = '0 0 6px #FFD700';
+                } else if (specialType === 'rainbow') {
+                    p.style.background = `linear-gradient(45deg, hsl(${i * 30}, 100%, 60%), hsl(${(i * 30 + 60) % 360}, 100%, 60%))`;
+                    p.style.boxShadow = '0 0 6px rgba(255,255,255,0.8)';
+                } else {
+                    p.style.background = `linear-gradient(45deg, #FFD700, #FF8E53)`;
+                }
+                
+                p.style.opacity = '0.8';
+                p.style.pointerEvents = 'none';
+                p.style.zIndex = '100';
+                p.style.transition = 'all 0.5s ease-out';
+                setTimeout(() => {
+                    p.style.left = (canvas.getBoundingClientRect().left + x + Math.cos(angle) * 40 - 4) + 'px';
+                    p.style.top = (canvas.getBoundingClientRect().top + y + Math.sin(angle) * 40 - 4) + 'px';
+                    p.style.opacity = '0';
+                }, 10);
+                setTimeout(() => effectLayer.removeChild(p), 600);
+                effectLayer.appendChild(p);
             }
         }
 
@@ -1090,10 +1491,10 @@
             effectLayer.appendChild(p);
         }
 
-        // 釘エフェクト（軽量化）
+        // 釘エフェクト
         function showObstacleEffect(x, y) {
             const effectLayer = document.getElementById('effectLayer');
-            for (let i = 0; i < 4; i++) { // パーティクル数を半減
+            for (let i = 0; i < 4; i++) {
                 const p = document.createElement('div');
                 const angle = (i / 4) * Math.PI * 2;
                 const px = x + Math.cos(angle) * 2;
@@ -1101,14 +1502,14 @@
                 p.style.position = 'absolute';
                 p.style.left = (canvas.getBoundingClientRect().left + px - 2) + 'px';
                 p.style.top = (canvas.getBoundingClientRect().top + py - 2) + 'px';
-                p.style.width = '3px'; // サイズ縮小
+                p.style.width = '3px';
                 p.style.height = '3px';
                 p.style.borderRadius = '50%';
                 p.style.background = 'linear-gradient(45deg, #FFD700, #fff)';
                 p.style.opacity = '0.7';
                 p.style.pointerEvents = 'none';
                 p.style.zIndex = '100';
-                p.style.transition = 'all 0.3s ease-out'; // 時間短縮
+                p.style.transition = 'all 0.3s ease-out';
                 setTimeout(() => {
                     p.style.left = (canvas.getBoundingClientRect().left + x + Math.cos(angle) * 12 - 2) + 'px';
                     p.style.top = (canvas.getBoundingClientRect().top + y + Math.sin(angle) * 12 - 2) + 'px';
@@ -1127,10 +1528,13 @@
             p.style.position = 'absolute';
             p.style.left = (canvas.getBoundingClientRect().left + x - 18) + 'px';
             p.style.top = (canvas.getBoundingClientRect().top + y - 18) + 'px';
-            p.style.fontSize = specialType === 'golden' ? '32px' : '28px';
+            p.style.fontSize = points >= 1000 ? '36px' : (specialType === 'golden' ? '32px' : '28px');
             p.style.fontWeight = 'bold';
             
-            if (specialType === 'golden') {
+            if (points >= 1000) {
+                p.style.color = '#FF1493';
+                p.style.textShadow = '0 0 15px #FF1493, 0 0 30px #00FFFF';
+            } else if (specialType === 'golden') {
                 p.style.color = '#FFD700';
                 p.style.textShadow = '0 0 12px #FFD700, 0 0 24px #FFA500';
             } else if (specialType === 'rainbow') {
@@ -1153,9 +1557,26 @@
             effectLayer.appendChild(p);
         }
 
-        // 描画（最適化済み）
+        // 描画（改良版）
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // パワーゾーンを描画
+            powerZones.forEach(zone => {
+                if (zone.type === 'speed' && powerZoneActive) {
+                    ctx.fillStyle = 'rgba(255, 20, 147, 0.3)';
+                    ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+                    ctx.strokeStyle = '#FF1493';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+                } else if (zone.type === 'multiball') {
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+                    ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+                    ctx.strokeStyle = '#00FFFF';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+                }
+            });
             
             // 発射台装飾
             ctx.save();
@@ -1167,36 +1588,54 @@
             ctx.fill();
             ctx.restore();
             
-            // 障害物を描画
-            ctx.fillStyle = '#8B4513';
+            // 障害物を描画（動く釘も含む）
             obstacles.forEach(obstacle => {
+                ctx.fillStyle = obstacle.moving ? '#FF6B6B' : '#8B4513';
                 ctx.beginPath();
                 ctx.arc(obstacle.x, obstacle.y, obstacle.radius, 0, Math.PI * 2);
                 ctx.fill();
+                
+                // 動く釘のオーラ
+                if (obstacle.moving) {
+                    ctx.strokeStyle = 'rgba(255, 107, 107, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(obstacle.x, obstacle.y, obstacle.radius + 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
             });
             
             // ポケットを描画
             pockets.forEach(pocket => {
-                ctx.fillStyle = '#FFD700';
+                if (pocket.type === 'bonus') {
+                    ctx.fillStyle = bonusModeActive ? '#FF1493' : '#FFD700';
+                    const gradient = ctx.createLinearGradient(pocket.x, pocket.y, pocket.x + pocket.width, pocket.y);
+                    gradient.addColorStop(0, '#FFD700');
+                    gradient.addColorStop(0.5, '#FF1493');
+                    gradient.addColorStop(1, '#00FFFF');
+                    ctx.fillStyle = gradient;
+                } else {
+                    ctx.fillStyle = '#FFD700';
+                }
                 ctx.fillRect(pocket.x, pocket.y, pocket.width, pocket.height);
                 ctx.fillStyle = '#000';
                 ctx.font = '12px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(pocket.points + 'pt', 
+                const text = pocket.type === 'bonus' ? 'BONUS' : pocket.points + 'pt';
+                ctx.fillText(text, 
                     pocket.x + pocket.width/2, 
                     pocket.y + pocket.height/2 + 4);
             });
             
-            // ボールの軌跡を描画（軽量化）
+            // ボールの軌跡を描画
             balls.forEach(ball => {
                 if (ball.trail && ball.trail.length > 2) {
                     ctx.strokeStyle = ball.specialType === 'rainbow' ? 
                         `hsla(${Date.now() / 20 % 360}, 100%, 60%, 0.5)` : 
                         'rgba(255, 215, 0, 0.4)';
-                    ctx.lineWidth = 1.5; // 軽量化
+                    ctx.lineWidth = 1.5;
                     ctx.beginPath();
                     ctx.moveTo(ball.trail[0].x, ball.trail[0].y);
-                    // 軌跡を間引いて描画
                     for (let i = 2; i < ball.trail.length; i += 2) {
                         ctx.lineTo(ball.trail[i].x, ball.trail[i].y);
                     }
@@ -1206,11 +1645,11 @@
             
             // ボールを描画
             balls.forEach(ball => {
-                // 特殊ボールのオーラ（軽量化）
+                // 特殊ボールのオーラ
                 if (ball.specialType === 'golden') {
                     ctx.save();
                     ctx.shadowColor = '#FFD700';
-                    ctx.shadowBlur = 10; // 軽量化
+                    ctx.shadowBlur = 10;
                     ctx.fillStyle = ball.color;
                     ctx.beginPath();
                     ctx.arc(ball.x, ball.y, ball.radius + 1, 0, Math.PI * 2);
@@ -1219,10 +1658,22 @@
                 } else if (ball.specialType === 'rainbow') {
                     ctx.save();
                     ctx.shadowColor = ball.color;
-                    ctx.shadowBlur = 8; // 軽量化
+                    ctx.shadowBlur = 8;
                     ctx.fillStyle = ball.color;
                     ctx.beginPath();
                     ctx.arc(ball.x, ball.y, ball.radius + 1, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+                
+                // ボーナスモード時のエフェクト
+                if (bonusModeActive) {
+                    ctx.save();
+                    ctx.shadowColor = '#FF1493';
+                    ctx.shadowBlur = 6;
+                    ctx.fillStyle = ball.color;
+                    ctx.beginPath();
+                    ctx.arc(ball.x, ball.y, ball.radius + 0.5, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.restore();
                 }
@@ -1241,7 +1692,7 @@
             });
         }
 
-        // 表示更新（最適化済み）
+        // 表示更新
         function updateDisplay() {
             const ballCountElem = document.getElementById('ballCount');
             const scoreElem = document.getElementById('score');
@@ -1255,7 +1706,7 @@
             }
             
             // アニメーション軽量化
-            if (frameCount % 10 === 0) { // 10フレームに1回だけアニメーション
+            if (frameCount % 10 === 0) {
                 ballCountElem.animate([
                     { transform: 'scale(1)', color: '#fff' },
                     { transform: 'scale(1.2)', color: '#FFD700' },
@@ -1295,7 +1746,16 @@
             dialog.style.fontWeight = 'bold';
             dialog.style.color = '#B8860B';
             dialog.style.textShadow = '0 0 8px #fff, 0 0 16px #FFD700';
-            dialog.innerHTML = `<div style=\"font-size:36px; margin-bottom:16px;\">🎉 ゲーム終了！ 🎉</div><div style=\"margin-bottom:12px;\">最終スコア: <span style='color:#FF8E53;'>${finalScore}</span></div><div style=\"margin-bottom:12px;\">最大コンボ: <span style='color:#FF6B6B;'>${combo}</span></div><button id='closeGameOverBtn' style='margin-top:18px;font-size:22px;padding:10px 32px;background:linear-gradient(45deg,#FFD700,#FF8E53);color:#fff;border:none;border-radius:18px;box-shadow:0 0 16px #FFD700;pointer-events:auto;'>閉じる</button>`;
+            
+            const achievementCount = achievements.length;
+            dialog.innerHTML = `
+                <div style="font-size:36px; margin-bottom:16px;">🎉 ゲーム終了！ 🎉</div>
+                <div style="margin-bottom:12px;">最終スコア: <span style='color:#FF8E53;'>${finalScore}</span></div>
+                <div style="margin-bottom:12px;">最大コンボ: <span style='color:#FF6B6B;'>${combo}</span></div>
+                <div style="margin-bottom:12px;">ハイスコア: <span style='color:#00FFFF;'>${highScore}</span></div>
+                <div style="margin-bottom:12px; font-size:18px;">アチーブメント: ${achievementCount}個達成</div>
+                <button id='closeGameOverBtn' style='margin-top:18px;font-size:22px;padding:10px 32px;background:linear-gradient(45deg,#FFD700,#FF8E53);color:#fff;border:none;border-radius:18px;box-shadow:0 0 16px #FFD700;pointer-events:auto;'>閉じる</button>
+            `;
             effectLayer.appendChild(dialog);
             setTimeout(() => { dialog.style.transform = 'translate(-50%,-50%) scale(1)'; }, 30);
             document.getElementById('closeGameOverBtn').onclick = () => {
@@ -1307,10 +1767,10 @@
             }
         }
 
-        // 花火エフェクト（軽量化）
+        // 花火エフェクト
         function showFirework(cx, cy) {
             const effectLayer = document.getElementById('effectLayer');
-            for (let i = 0; i < 12; i++) { // パーティクル数を半減
+            for (let i = 0; i < 12; i++) {
                 const p = document.createElement('div');
                 const angle = (i / 12) * Math.PI * 2;
                 const px = cx + Math.cos(angle) * 8;
@@ -1325,7 +1785,7 @@
                 p.style.opacity = '0.9';
                 p.style.pointerEvents = 'none';
                 p.style.zIndex = '10000';
-                p.style.transition = 'all 1s ease-out'; // 時間短縮
+                p.style.transition = 'all 1s ease-out';
                 setTimeout(() => {
                     p.style.left = (cx + Math.cos(angle) * 60) + 'px';
                     p.style.top = (cy + Math.sin(angle) * 60) + 'px';
@@ -1336,12 +1796,11 @@
             }
         }
         
-        // 特殊ボールライト（最適化済み）
+        // 特殊ボールライト
         function triggerSpecialBallLights(type) {
-            const duration = type === 'golden' ? 1000 : 800; // 時間短縮
+            const duration = type === 'golden' ? 1000 : 800;
             const className = type === 'golden' ? 'special' : 'combo';
             
-            // LEDを一時的に特殊状態に（バッチ処理）
             requestAnimationFrame(() => {
                 [...leftLeds, ...rightLeds].forEach(led => {
                     led.classList.add(className);
@@ -1357,12 +1816,11 @@
             }, duration);
         }
         
-        // ステージクリアライト（最適化済み）
+        // ステージクリアライト
         function triggerStageClearLights() {
             const stageLighting = document.getElementById('stageLighting');
             stageLighting.classList.add('active');
             
-            // 全LEDを金色に（バッチ処理）
             requestAnimationFrame(() => {
                 [...leftLeds, ...rightLeds].forEach(led => {
                     led.classList.add('special');
@@ -1376,16 +1834,33 @@
                         led.classList.remove('special');
                     });
                 });
-            }, 2000); // 時間短縮
+            }, 2000);
         }
         
-        // 大当たり演出（最適化済み）
+        // 大当たり演出（改良版）
         function triggerJackpotLights() {
-            // 全LEDをジャックポットモードに（バッチ処理）
+            // ボーナスモード中は演出を控えめに
+            if (bonusModeActive) {
+                // ボーナス中は簡単な演出のみ
+                [...leftLeds, ...rightLeds].forEach(led => {
+                    led.classList.add('special');
+                });
+                
+                setTimeout(() => {
+                    requestAnimationFrame(() => {
+                        [...leftLeds, ...rightLeds].forEach(led => {
+                            led.classList.remove('special');
+                        });
+                    });
+                }, 800);
+                return;
+            }
+            
+            // 通常時の派手な演出
             [...leftLeds, ...rightLeds].forEach((led, i) => {
                 setTimeout(() => {
                     led.classList.add('jackpot');
-                }, i * 25); // 間隔短縮
+                }, i * 25);
             });
             
             setTimeout(() => {
@@ -1394,15 +1869,15 @@
                         led.classList.remove('jackpot');
                     });
                 });
-            }, 1500); // 時間短縮
+            }, 1500);
         }
         
-        // レインボー演出（最適化済み）
+        // レインボー演出
         function triggerRainbowShow() {
             [...leftLeds, ...rightLeds].forEach((led, i) => {
                 setTimeout(() => {
                     led.classList.add('rainbow');
-                }, i * 20); // 間隔短縮
+                }, i * 20);
             });
             
             setTimeout(() => {
@@ -1411,13 +1886,13 @@
                         led.classList.remove('rainbow');
                     });
                 });
-            }, 2000); // 時間短縮
+            }, 2000);
         }
 
         function nextStage() {
             stage++;
             ballCount = ballsBonus + ballsPerStage;
-            targetScore = Math.floor(score * 1.5 + 80);
+            targetScore = Math.floor(score * 1.5 + 100);
             power = 50;
             isChargingPower = false;
             powerDirection = 1;
@@ -1426,16 +1901,17 @@
             comboMultiplier = 1.0;
             updateDisplay();
             updateComboDisplay();
+            updateFeatureIndicator();
             const powerFill = document.getElementById('powerFill');
             powerFill.style.width = '33.3%';
         }
 
-        // ゲームリセット（最適化済み）
+        // ゲームリセット（改良版）
         function resetGame() {
             balls = [];
             score = 0;
             stage = 1;
-            targetScore = 300;
+            targetScore = 350;
             ballCount = ballsPerStage;
             power = 50;
             isChargingPower = false;
@@ -1444,15 +1920,26 @@
             combo = 0;
             comboMultiplier = 1.0;
             ballsLaunched = 0;
-            frameCount = 0; // フレームカウントリセット
+            frameCount = 0;
+            
+            // 新機能リセット
+            multiballActive = false;
+            powerZoneActive = false;
+            powerZoneTimer = 0;
+            bonusModeTimer = 0;
+            
+            // ボーナスモード終了（確実にクリーンアップ）
+            deactivateBonusMode();
+            
             updateDisplay();
             updateComboDisplay();
             updateSpecialBallIndicator();
+            updateFeatureIndicator();
             
-            // ライトリセット（バッチ処理）
+            // LEDライトの完全リセット
             requestAnimationFrame(() => {
                 [...leftLeds, ...rightLeds].forEach(led => {
-                    led.classList.remove('active', 'combo', 'special', 'jackpot', 'rainbow');
+                    led.classList.remove('active', 'combo', 'special', 'jackpot', 'rainbow', 'wave');
                     led.style.opacity = '';
                 });
             });
@@ -1460,7 +1947,6 @@
             const stageLighting = document.getElementById('stageLighting');
             stageLighting.classList.remove('active');
             
-            // ダイアログクリーンアップ
             const dialog = document.getElementById('gameOverDialog');
             const effectLayer = document.getElementById('effectLayer');
             if (dialog && dialog.parentNode) dialog.parentNode.removeChild(dialog);
@@ -1468,22 +1954,13 @@
             
             const powerFill = document.getElementById('powerFill');
             powerFill.style.width = '33.3%';
+            powerFill.style.boxShadow = '0 0 8px #FFEB3B, 0 0 16px #FF5722';
             
-            // アニメーションID管理
             if (lightingAnimationId) {
                 cancelAnimationFrame(lightingAnimationId);
                 lightingAnimationId = null;
             }
-            if (idleShowId) {
-                cancelAnimationFrame(idleShowId);
-                idleShowId = null;
-            }
-            if (shootingStarId) {
-                clearInterval(shootingStarId);
-                shootingStarId = null;
-            }
             
-            // 再スタート
             startBackgroundEffects();
         }
 
