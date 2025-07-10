@@ -150,10 +150,133 @@
             display: none;
         }
 
+        /* サイド装飾 */
+        .side-decoration {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            width: 80px;
+            z-index: 1;
+            pointer-events: none;
+        }
+        
+        .left-side {
+            left: 0;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-right: 3px solid #FFD700;
+        }
+        
+        .right-side {
+            right: 0;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-left: 3px solid #FFD700;
+        }
+        
+        /* LEDライト */
+        .led-strip {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 10px;
+            bottom: 10px;
+            width: 20px;
+        }
+        
+        .led {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin: 4px auto;
+            background: #333;
+            border: 2px solid #666;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .led.active {
+            background: radial-gradient(circle at 30% 30%, #fff, #FFD700);
+            border-color: #FFD700;
+            box-shadow: 0 0 12px #FFD700, 0 0 24px #FFD700, inset 0 2px 4px rgba(255,255,255,0.3);
+        }
+        
+        .led.combo {
+            background: radial-gradient(circle at 30% 30%, #fff, #FF1493);
+            border-color: #FF1493;
+            box-shadow: 0 0 12px #FF1493, 0 0 24px #FF1493, inset 0 2px 4px rgba(255,255,255,0.3);
+            animation: pulse-pink 0.5s infinite alternate;
+        }
+        
+        .led.special {
+            background: radial-gradient(circle at 30% 30%, #fff, #00FFFF);
+            border-color: #00FFFF;
+            box-shadow: 0 0 12px #00FFFF, 0 0 24px #00FFFF, inset 0 2px 4px rgba(255,255,255,0.3);
+            animation: pulse-cyan 0.8s infinite alternate;
+        }
+        
+        /* ネオンサイン */
+        .neon-sign {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-90deg);
+            font-family: 'Arial', sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 0 0 5px #FFD700, 0 0 10px #FFD700, 0 0 15px #FFD700;
+            white-space: nowrap;
+            letter-spacing: 2px;
+        }
+        
+        .right-side .neon-sign {
+            transform: translate(-50%, -50%) rotate(90deg);
+        }
+        
+        /* アニメーション */
+        @keyframes pulse-pink {
+            0% { box-shadow: 0 0 8px #FF1493, 0 0 16px #FF1493, inset 0 2px 4px rgba(255,255,255,0.3); }
+            100% { box-shadow: 0 0 16px #FF1493, 0 0 32px #FF1493, inset 0 2px 4px rgba(255,255,255,0.3); }
+        }
+        
+        @keyframes pulse-cyan {
+            0% { box-shadow: 0 0 8px #00FFFF, 0 0 16px #00FFFF, inset 0 2px 4px rgba(255,255,255,0.3); }
+            100% { box-shadow: 0 0 16px #00FFFF, 0 0 32px #00FFFF, inset 0 2px 4px rgba(255,255,255,0.3); }
+        }
+        
+        @keyframes wave-light {
+            0% { opacity: 0.3; }
+            50% { opacity: 1; }
+            100% { opacity: 0.3; }
+        }
+        
+        /* 全体ライトアップ */
+        .stage-clear-lighting {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at center, rgba(255,215,0,0.1) 0%, rgba(255,215,0,0.05) 50%, transparent 100%);
+            z-index: 9998;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        
+        .stage-clear-lighting.active {
+            opacity: 1;
+            animation: stage-glow 2s ease-in-out;
+        }
+        
+        @keyframes stage-glow {
+            0%, 100% { background: radial-gradient(circle at center, rgba(255,215,0,0.1) 0%, rgba(255,215,0,0.05) 50%, transparent 100%); }
+            50% { background: radial-gradient(circle at center, rgba(255,215,0,0.3) 0%, rgba(255,215,0,0.15) 50%, transparent 100%); }
+        }
+
         /* 固定コントロール */
         .fixed-controls {
             position: fixed;
-            left: 32px;
+            left: 140px;
             top: 32px;
             z-index: 10010;
             background: linear-gradient(135deg, #232526cc 0%, #FFD70033 100%);
@@ -177,6 +300,24 @@
     </style>
 </head>
 <body>
+    
+    <!-- サイド装飾 -->
+    <div class="side-decoration left-side">
+        <div class="led-strip" id="leftLedStrip">
+            <!-- LEDライトはJavaScriptで動的生成 -->
+        </div>
+        <div class="neon-sign">WEB PACHI</div>
+    </div>
+    
+    <div class="side-decoration right-side">
+        <div class="led-strip" id="rightLedStrip">
+            <!-- LEDライトはJavaScriptで動的生成 -->
+        </div>
+        <div class="neon-sign">JACKPOT</div>
+    </div>
+    
+    <!-- 全体ライトアップ -->
+    <div class="stage-clear-lighting" id="stageLighting"></div>
 
     <!-- 画面右上に固定表示 -->
     <div class="global-status" style="position:fixed;top:24px;right:32px;z-index:10001;text-align:right;min-width:180px;">
@@ -233,6 +374,11 @@
         let comboMultiplier = 1.0;
         let ballsLaunched = 0;
         let isSpecialBallReady = false;
+        
+        // ライト制御
+        let leftLeds = [];
+        let rightLeds = [];
+        let lightingAnimationId = null;
 
         // 初期化
         function init() {
@@ -242,6 +388,7 @@
             setupObstacles();
             setupPockets();
             setupEvents();
+            setupLEDs();
             updateComboDisplay();
             
             gameRunning = true;
@@ -274,6 +421,126 @@
                 { x: 170, y: canvas.height - 100, width: 60, height: 20, points: 50 },
                 { x: 290, y: canvas.height - 80, width: 60, height: 20, points: 100 }
             );
+        }
+        
+        // LED設定
+        function setupLEDs() {
+            const leftStrip = document.getElementById('leftLedStrip');
+            const rightStrip = document.getElementById('rightLedStrip');
+            
+            // 左側LED（35個に増加）
+            for (let i = 0; i < 35; i++) {
+                const led = document.createElement('div');
+                led.className = 'led';
+                leftStrip.appendChild(led);
+                leftLeds.push(led);
+            }
+            
+            // 右側LED（35個に増加）
+            for (let i = 0; i < 35; i++) {
+                const led = document.createElement('div');
+                led.className = 'led';
+                rightStrip.appendChild(led);
+                rightLeds.push(led);
+            }
+            
+            startLightingAnimation();
+        }
+        
+        // ライトアニメーション開始
+        function startLightingAnimation() {
+            let frame = 0;
+            
+            function animate() {
+                // 基本的な波状ライト
+                leftLeds.forEach((led, i) => {
+                    const wave = Math.sin((frame + i * 0.3) * 0.1);
+                    led.style.opacity = 0.3 + wave * 0.2;
+                });
+                
+                rightLeds.forEach((led, i) => {
+                    const wave = Math.sin((frame + i * 0.3 + Math.PI) * 0.1);
+                    led.style.opacity = 0.3 + wave * 0.2;
+                });
+                
+                frame++;
+                lightingAnimationId = requestAnimationFrame(animate);
+            }
+            
+            animate();
+        }
+        
+        // スコアライト更新（最適化済み）
+        function updateScoreLights() {
+            const scoreRatio = Math.min(score / targetScore, 1);
+            const activeLeds = Math.floor(scoreRatio * 35);
+            
+            // バッチ更新でリフロー最小化
+            requestAnimationFrame(() => {
+                leftLeds.forEach((led, i) => {
+                    const shouldBeActive = i < activeLeds;
+                    const isCurrentlyActive = led.classList.contains('active');
+                    
+                    if (shouldBeActive !== isCurrentlyActive) {
+                        led.classList.toggle('active', shouldBeActive);
+                    }
+                });
+            });
+        }
+        
+        // コンボライト更新
+        function updateComboLights() {
+            requestAnimationFrame(() => {
+                rightLeds.forEach((led, i) => {
+                    led.classList.remove('combo', 'special');
+                    
+                    if (combo > 0) {
+                        const comboLeds = Math.min(combo, 35);
+                        if (i < comboLeds) {
+                            led.classList.add(combo >= 5 ? 'special' : 'combo');
+                        }
+                    }
+                });
+            });
+        }
+        
+        // 特殊ボールライト
+        function triggerSpecialBallLights(type) {
+            const duration = type === 'golden' ? 1500 : 1000;
+            const className = type === 'golden' ? 'special' : 'combo';
+            
+            // 全LEDを一時的に特殊状態に
+            [...leftLeds, ...rightLeds].forEach(led => {
+                led.classList.add(className);
+            });
+            
+            setTimeout(() => {
+                [...leftLeds, ...rightLeds].forEach(led => {
+                    led.classList.remove(className);
+                });
+                updateScoreLights();
+                updateComboLights();
+            }, duration);
+        }
+        
+        // ステージクリアライト
+        function triggerStageClearLights() {
+            const stageLighting = document.getElementById('stageLighting');
+            stageLighting.classList.add('active');
+            
+            // 全LEDを金色に
+            [...leftLeds, ...rightLeds].forEach(led => {
+                led.classList.add('special');
+            });
+            
+            setTimeout(() => {
+                stageLighting.classList.remove('active');
+                [...leftLeds, ...rightLeds].forEach(led => {
+                    led.classList.remove('special');
+                });
+                updateScoreLights();
+                updateComboLights();
+            }, 3000);
         }
 
         // イベント設定
@@ -346,6 +613,12 @@
             };
             balls.push(ball);
             ballsLaunched++;
+            
+            // 特殊ボールのライト演出
+            if (specialType !== 'normal') {
+                triggerSpecialBallLights(specialType);
+            }
+            
             updateDisplay();
             updateSpecialBallIndicator();
             showLaunchEffect(ball.x, ball.y, specialType);
@@ -447,6 +720,7 @@
                 comboMultiplier = 1.0;
             }
             updateComboDisplay();
+            updateComboLights();
         }
 
         // コンボ表示更新
@@ -569,6 +843,7 @@
             // ステージクリア・ゲームオーバー判定
             if (ballCount <= 0 && balls.length === 0 && !gameOverDialogShown) {
                 if (score >= targetScore) {
+                    triggerStageClearLights();
                     for (let i = 0; i < 3; i++) {
                         setTimeout(() => showFirework(200 + i*80, 200 + Math.random()*100), i*400);
                     }
@@ -778,6 +1053,9 @@
             ], { duration: 400 });
             const launchBtn = document.getElementById('launchBtn');
             launchBtn.disabled = ballCount <= 0;
+            
+            // ライト更新
+            updateScoreLights();
         }
 
         // ゲームオーバー演出
@@ -877,6 +1155,14 @@
             updateDisplay();
             updateComboDisplay();
             updateSpecialBallIndicator();
+            
+            // ライトリセット
+            [...leftLeds, ...rightLeds].forEach(led => {
+                led.classList.remove('active', 'combo', 'special');
+            });
+            const stageLighting = document.getElementById('stageLighting');
+            stageLighting.classList.remove('active');
+            
             const dialog = document.getElementById('gameOverDialog');
             const effectLayer = document.getElementById('effectLayer');
             if (dialog && dialog.parentNode) dialog.parentNode.removeChild(dialog);
