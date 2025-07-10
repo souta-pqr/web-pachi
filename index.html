@@ -14,6 +14,40 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        /* 背景流星エフェクト */
+        .shooting-stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        
+        .shooting-star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: linear-gradient(90deg, #FFD700, transparent);
+            border-radius: 50%;
+            animation: shooting 3s linear infinite;
+        }
+        
+        @keyframes shooting {
+            0% {
+                transform: translateX(-100px) translateY(-100px);
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(100vw) translateY(100vh);
+                opacity: 0;
+            }
         }
         
         .game-container {
@@ -23,6 +57,30 @@
             box-shadow: 0 8px 32px 0 rgba(31,38,135,0.37), 0 2px 8px #0008;
             text-align: center;
             max-width: 440px;
+            position: relative;
+            border: 3px solid #FFD700;
+        }
+        
+        /* ゲーム領域装飾ライト */
+        .game-border-lights {
+            position: absolute;
+            top: -6px;
+            left: -6px;
+            right: -6px;
+            bottom: -6px;
+            border-radius: 27px;
+            background: linear-gradient(45deg, 
+                #FFD700 0%, #FF6B6B 25%, #4ECDC4 50%, #45B7D1 75%, #FFD700 100%);
+            background-size: 400% 400%;
+            animation: border-rainbow 3s ease infinite;
+            z-index: -1;
+        }
+        
+        @keyframes border-rainbow {
+            0%, 100% { background-position: 0% 0%; }
+            25% { background-position: 100% 0%; }
+            50% { background-position: 100% 100%; }
+            75% { background-position: 0% 100%; }
         }
         
         .game-info {
@@ -57,6 +115,47 @@
             display: block;
             margin: 0 auto 18px;
             box-shadow: 0 4px 24px #FFD70033, 0 1.5px 6px #0002;
+            position: relative;
+        }
+        
+        /* キャンバス装飾ライト */
+        .canvas-decoration {
+            position: absolute;
+            pointer-events: none;
+        }
+        
+        .top-lights, .bottom-lights {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+        
+        .top-lights {
+            top: -15px;
+            left: 10px;
+            right: 10px;
+            height: 8px;
+        }
+        
+        .bottom-lights {
+            bottom: -15px;
+            left: 10px;
+            right: 10px;
+            height: 8px;
+        }
+        
+        .corner-light {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #FFD700, #FF8E53);
+            box-shadow: 0 0 8px #FFD700;
+            animation: corner-twinkle 1.5s ease-in-out infinite alternate;
+        }
+        
+        @keyframes corner-twinkle {
+            0% { opacity: 0.6; transform: scale(1); }
+            100% { opacity: 1; transform: scale(1.2); }
         }
         
         .controls-row {
@@ -213,6 +312,24 @@
             animation: pulse-cyan 0.8s infinite alternate;
         }
         
+        .led.rainbow {
+            background: radial-gradient(circle at 30% 30%, #fff, #FF00FF);
+            border-color: #FF00FF;
+            box-shadow: 0 0 12px #FF00FF, 0 0 24px #FF00FF, inset 0 2px 4px rgba(255,255,255,0.3);
+            animation: rainbow-cycle 1s infinite linear;
+        }
+        
+        .led.jackpot {
+            background: radial-gradient(circle at 30% 30%, #fff, #FF4500);
+            border-color: #FF4500;
+            box-shadow: 0 0 15px #FF4500, 0 0 30px #FF4500, inset 0 2px 4px rgba(255,255,255,0.3);
+            animation: jackpot-flash 0.3s infinite alternate;
+        }
+        
+        .led.wave {
+            animation: wave-glow 2s ease-in-out infinite;
+        }
+        
         /* ネオンサイン */
         .neon-sign {
             position: absolute;
@@ -241,6 +358,73 @@
         @keyframes pulse-cyan {
             0% { box-shadow: 0 0 8px #00FFFF, 0 0 16px #00FFFF, inset 0 2px 4px rgba(255,255,255,0.3); }
             100% { box-shadow: 0 0 16px #00FFFF, 0 0 32px #00FFFF, inset 0 2px 4px rgba(255,255,255,0.3); }
+        }
+        
+        @keyframes rainbow-cycle {
+            0% { 
+                background: radial-gradient(circle at 30% 30%, #fff, #FF0000);
+                border-color: #FF0000;
+                box-shadow: 0 0 12px #FF0000, 0 0 24px #FF0000, inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+            16% { 
+                background: radial-gradient(circle at 30% 30%, #fff, #FF8000);
+                border-color: #FF8000;
+                box-shadow: 0 0 12px #FF8000, 0 0 24px #FF8000, inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+            33% { 
+                background: radial-gradient(circle at 30% 30%, #fff, #FFFF00);
+                border-color: #FFFF00;
+                box-shadow: 0 0 12px #FFFF00, 0 0 24px #FFFF00, inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+            50% { 
+                background: radial-gradient(circle at 30% 30%, #fff, #00FF00);
+                border-color: #00FF00;
+                box-shadow: 0 0 12px #00FF00, 0 0 24px #00FF00, inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+            66% { 
+                background: radial-gradient(circle at 30% 30%, #fff, #0080FF);
+                border-color: #0080FF;
+                box-shadow: 0 0 12px #0080FF, 0 0 24px #0080FF, inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+            83% { 
+                background: radial-gradient(circle at 30% 30%, #fff, #8000FF);
+                border-color: #8000FF;
+                box-shadow: 0 0 12px #8000FF, 0 0 24px #8000FF, inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+            100% { 
+                background: radial-gradient(circle at 30% 30%, #fff, #FF0080);
+                border-color: #FF0080;
+                box-shadow: 0 0 12px #FF0080, 0 0 24px #FF0080, inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+        }
+        
+        @keyframes jackpot-flash {
+            0% { 
+                box-shadow: 0 0 15px #FF4500, 0 0 30px #FF4500, inset 0 2px 4px rgba(255,255,255,0.3);
+                transform: scale(1);
+            }
+            100% { 
+                box-shadow: 0 0 25px #FF4500, 0 0 50px #FF4500, 0 0 75px #FF4500, inset 0 2px 4px rgba(255,255,255,0.3);
+                transform: scale(1.1);
+            }
+        }
+        
+        @keyframes wave-glow {
+            0% { 
+                background: radial-gradient(circle at 30% 30%, #fff, #4ECDC4);
+                border-color: #4ECDC4;
+                box-shadow: 0 0 8px #4ECDC4, 0 0 16px #4ECDC4, inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+            50% { 
+                background: radial-gradient(circle at 30% 30%, #fff, #45B7D1);
+                border-color: #45B7D1;
+                box-shadow: 0 0 12px #45B7D1, 0 0 24px #45B7D1, inset 0 2px 4px rgba(255,255,255,0.3);
+            }
+            100% { 
+                background: radial-gradient(circle at 30% 30%, #fff, #4ECDC4);
+                border-color: #4ECDC4;
+                box-shadow: 0 0 8px #4ECDC4, 0 0 16px #4ECDC4, inset 0 2px 4px rgba(255,255,255,0.3);
+            }
         }
         
         @keyframes wave-light {
@@ -301,6 +485,9 @@
 </head>
 <body>
     
+    <!-- 背景流星エフェクト -->
+    <div class="shooting-stars" id="shootingStars"></div>
+    
     <!-- サイド装飾 -->
     <div class="side-decoration left-side">
         <div class="led-strip" id="leftLedStrip">
@@ -326,6 +513,7 @@
     </div>
 
     <div class="game-container">
+        <div class="game-border-lights"></div>
         <h1 style="color: #FFD700; margin-bottom: 20px;">Web Pachi</h1>
 
         <div class="game-info">
@@ -337,7 +525,24 @@
 
         <div id="effectLayer" style="position:absolute;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:10;"></div>
 
-        <canvas id="gameCanvas" width="400" height="480"></canvas>
+        <div style="position: relative;">
+            <canvas id="gameCanvas" width="400" height="480"></canvas>
+            <!-- キャンバス装飾ライト -->
+            <div class="canvas-decoration top-lights">
+                <div class="corner-light"></div>
+                <div class="corner-light"></div>
+                <div class="corner-light"></div>
+                <div class="corner-light"></div>
+                <div class="corner-light"></div>
+            </div>
+            <div class="canvas-decoration bottom-lights">
+                <div class="corner-light"></div>
+                <div class="corner-light"></div>
+                <div class="corner-light"></div>
+                <div class="corner-light"></div>
+                <div class="corner-light"></div>
+            </div>
+        </div>
         
         <!-- 右上に固定配置 -->
         <div class="fixed-controls">
@@ -379,6 +584,8 @@
         let leftLeds = [];
         let rightLeds = [];
         let lightingAnimationId = null;
+        let idleShowId = null;
+        let shootingStarId = null;
 
         // 初期化
         function init() {
@@ -389,6 +596,7 @@
             setupPockets();
             setupEvents();
             setupLEDs();
+            startBackgroundEffects();
             updateComboDisplay();
             
             gameRunning = true;
@@ -452,15 +660,32 @@
             let frame = 0;
             
             function animate() {
-                // 基本的な波状ライト
+                // ゲーム中でない場合はアイドル演出に任せる
+                if (ballCount > 0 && balls.length === 0) {
+                    frame++;
+                    lightingAnimationId = requestAnimationFrame(animate);
+                    return;
+                }
+                
+                // ゲーム中の基本的な波状ライト
                 leftLeds.forEach((led, i) => {
-                    const wave = Math.sin((frame + i * 0.3) * 0.1);
-                    led.style.opacity = 0.3 + wave * 0.2;
+                    if (!led.classList.contains('active') && 
+                        !led.classList.contains('special') && 
+                        !led.classList.contains('jackpot') && 
+                        !led.classList.contains('rainbow')) {
+                        const wave = Math.sin((frame + i * 0.3) * 0.1);
+                        led.style.opacity = 0.3 + wave * 0.2;
+                    }
                 });
                 
                 rightLeds.forEach((led, i) => {
-                    const wave = Math.sin((frame + i * 0.3 + Math.PI) * 0.1);
-                    led.style.opacity = 0.3 + wave * 0.2;
+                    if (!led.classList.contains('combo') && 
+                        !led.classList.contains('special') && 
+                        !led.classList.contains('jackpot') && 
+                        !led.classList.contains('rainbow')) {
+                        const wave = Math.sin((frame + i * 0.3 + Math.PI) * 0.1);
+                        led.style.opacity = 0.3 + wave * 0.2;
+                    }
                 });
                 
                 frame++;
@@ -540,6 +765,97 @@
                 });
                 updateScoreLights();
                 updateComboLights();
+            }, 3000);
+        }
+        
+        // 背景エフェクト開始
+        function startBackgroundEffects() {
+            createShootingStars();
+            startIdleShow();
+        }
+        
+        // 流星生成
+        function createShootingStars() {
+            const container = document.getElementById('shootingStars');
+            
+            function createStar() {
+                const star = document.createElement('div');
+                star.className = 'shooting-star';
+                star.style.left = Math.random() * 100 + 'vw';
+                star.style.top = Math.random() * 100 + 'vh';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                container.appendChild(star);
+                
+                setTimeout(() => {
+                    if (container.contains(star)) {
+                        container.removeChild(star);
+                    }
+                }, 3000);
+            }
+            
+            // 定期的に流星を生成
+            shootingStarId = setInterval(createStar, 2000);
+        }
+        
+        // アイドル時のライトショー
+        function startIdleShow() {
+            let idleFrame = 0;
+            
+            function idleAnimation() {
+                if (ballCount > 0 && balls.length === 0) {
+                    // 波状パターン
+                    [...leftLeds, ...rightLeds].forEach((led, i) => {
+                        led.classList.remove('wave', 'rainbow');
+                        
+                        const wave = Math.sin((idleFrame + i * 0.2) * 0.05);
+                        if (wave > 0.5) {
+                            led.classList.add('wave');
+                        }
+                        
+                        // たまに虹色
+                        if (Math.sin((idleFrame + i * 0.1) * 0.02) > 0.8) {
+                            led.classList.add('rainbow');
+                        }
+                    });
+                }
+                
+                idleFrame++;
+                idleShowId = requestAnimationFrame(idleAnimation);
+            }
+            
+            idleAnimation();
+        }
+        
+        // 大当たり演出
+        function triggerJackpotLights() {
+            // 全LEDをジャックポットモードに
+            [...leftLeds, ...rightLeds].forEach((led, i) => {
+                setTimeout(() => {
+                    led.classList.add('jackpot');
+                }, i * 50);
+            });
+            
+            setTimeout(() => {
+                [...leftLeds, ...rightLeds].forEach(led => {
+                    led.classList.remove('jackpot');
+                });
+                updateScoreLights();
+                updateComboLights();
+            }, 2000);
+        }
+        
+        // レインボー演出
+        function triggerRainbowShow() {
+            [...leftLeds, ...rightLeds].forEach((led, i) => {
+                setTimeout(() => {
+                    led.classList.add('rainbow');
+                }, i * 30);
+            });
+            
+            setTimeout(() => {
+                [...leftLeds, ...rightLeds].forEach(led => {
+                    led.classList.remove('rainbow');
+                });
             }, 3000);
         }
 
@@ -715,6 +1031,13 @@
             if (success) {
                 combo++;
                 comboMultiplier = 1.0 + (combo * 0.2);
+                
+                // 高コンボ時の特殊演出
+                if (combo === 10) {
+                    triggerJackpotLights();
+                } else if (combo === 5) {
+                    triggerRainbowShow();
+                }
             } else {
                 combo = 0;
                 comboMultiplier = 1.0;
