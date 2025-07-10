@@ -303,13 +303,6 @@
             animation: rainbow-cycle 1s infinite linear;
         }
         
-        .led.jackpot {
-            background: radial-gradient(circle at 30% 30%, #fff, #FF4500);
-            border-color: #FF4500;
-            box-shadow: 0 0 15px #FF4500, 0 0 30px #FF4500, inset 0 2px 4px rgba(255,255,255,0.3);
-            animation: jackpot-flash 0.3s infinite alternate;
-        }
-        
         .led.wave {
             animation: wave-glow 2s ease-in-out infinite;
         }
@@ -379,17 +372,6 @@
                 background: radial-gradient(circle at 30% 30%, #fff, #FF0080);
                 border-color: #FF0080;
                 box-shadow: 0 0 12px #FF0080, 0 0 24px #FF0080, inset 0 2px 4px rgba(255,255,255,0.3);
-            }
-        }
-        
-        @keyframes jackpot-flash {
-            0% { 
-                box-shadow: 0 0 15px #FF4500, 0 0 30px #FF4500, inset 0 2px 4px rgba(255,255,255,0.3);
-                transform: scale(1);
-            }
-            100% { 
-                box-shadow: 0 0 25px #FF4500, 0 0 50px #FF4500, 0 0 75px #FF4500, inset 0 2px 4px rgba(255,255,255,0.3);
-                transform: scale(1.1);
             }
         }
         
@@ -496,36 +478,6 @@
         .achievement-popup.show {
             transform: translate(-50%, -50%) scale(1);
         }
-        
-        .bonus-mode-indicator {
-            position: fixed;
-            top: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(45deg, #FF1493, #00FFFF);
-            color: #fff;
-            padding: 12px 24px;
-            border-radius: 25px;
-            font-weight: bold;
-            font-size: 20px;
-            text-align: center;
-            z-index: 10000;
-            box-shadow: 0 0 20px #FF1493;
-            animation: bonus-pulse 0.8s infinite alternate;
-            opacity: 0;
-            transform: translateX(-50%) translateY(-20px);
-            transition: all 0.3s ease;
-        }
-        
-        .bonus-mode-indicator.active {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-        
-        @keyframes bonus-pulse {
-            0% { box-shadow: 0 0 20px #FF1493; }
-            100% { box-shadow: 0 0 30px #FF1493, 0 0 40px #00FFFF; }
-        }
     </style>
 </head>
 <body>
@@ -557,9 +509,6 @@
         <div class="combo-info" id="comboInfo" style="color:#FF6B6B;font-size:18px;font-weight:bold;text-shadow:0 0 8px #FF6B6B;">コンボ: 0 (×1.0)</div>
         <div class="highscore-info" id="highscoreInfo" style="color:#00FFFF;font-size:14px;font-weight:bold;text-shadow:0 0 8px #00FFFF;margin-top:5px;">ハイスコア: 0</div>
     </div>
-
-    <!-- ボーナスモード表示 -->
-    <div class="bonus-mode-indicator" id="bonusModeIndicator">🔥 FEVER TIME 🔥</div>
 
     <!-- アチーブメント通知 -->
     <div class="achievement-popup" id="achievementPopup">
@@ -645,8 +594,6 @@
         let multiballActive = false;
         let powerZoneActive = false;
         let powerZoneTimer = 0;
-        let bonusModeActive = false;
-        let bonusModeTimer = 0;
         let movingNails = true;
         let achievements = [];
         
@@ -712,8 +659,8 @@
                 { x: 50, y: canvas.height - 80, width: 60, height: 20, points: 100, type: 'normal' },
                 { x: 170, y: canvas.height - 100, width: 60, height: 20, points: 50, type: 'normal' },
                 { x: 290, y: canvas.height - 80, width: 60, height: 20, points: 100, type: 'normal' },
-                // ボーナスポケット
-                { x: 150, y: canvas.height - 50, width: 100, height: 15, points: 500, type: 'bonus' }
+                // 高得点ポケット
+                { x: 150, y: canvas.height - 50, width: 100, height: 15, points: 500, type: 'special' }
             );
         }
         
@@ -762,8 +709,8 @@
                     updateMovingObstacles();
                 }
                 
-                // ボーナスモード管理
-                updateBonusMode();
+                // パワーゾーン管理
+                updatePowerZone();
                 
                 lightingAnimationId = requestAnimationFrame(animationLoop);
             }
@@ -782,22 +729,8 @@
             });
         }
         
-        // ボーナスモード管理（改良版）
-        function updateBonusMode() {
-            if (bonusModeActive) {
-                bonusModeTimer--;
-                // タイマー表示更新（残り時間表示）
-                const indicator = document.getElementById('bonusModeIndicator');
-                if (bonusModeTimer > 0) {
-                    const secondsLeft = Math.ceil(bonusModeTimer / 60);
-                    indicator.textContent = `🔥 FEVER TIME ${secondsLeft}s 🔥`;
-                }
-                
-                if (bonusModeTimer <= 0) {
-                    deactivateBonusMode();
-                }
-            }
-            
+        // パワーゾーン管理
+        function updatePowerZone() {
             if (powerZoneActive) {
                 powerZoneTimer--;
                 if (powerZoneTimer <= 0) {
@@ -821,46 +754,33 @@
                     led.classList.toggle('active', shouldBeActive);
                 }
                 
-                // ボーナスモード時は特殊エフェクトを制限（競合回避）
-                if (bonusModeActive) {
-                    // ボーナス中は基本的なアイドルエフェクトのみ
-                    if (!shouldBeActive && !led.classList.contains('jackpot')) {
-                        const wave = Math.sin((frameCount * 0.08 + i * 0.2));
-                        led.style.opacity = 0.4 + wave * 0.2;
-                    }
-                } else {
-                    // 通常時のアイドルエフェクト
-                    if (ballCount > 0 && balls.length === 0 && !shouldBeActive) {
-                        const wave = Math.sin((frameCount * 0.05 + i * 0.3));
-                        led.style.opacity = 0.3 + wave * 0.1;
-                    }
-                    led.classList.remove('rainbow'); // ボーナス終了時にクリーンアップ
+                // 通常時のアイドルエフェクト
+                if (ballCount > 0 && balls.length === 0 && !shouldBeActive) {
+                    const wave = Math.sin((frameCount * 0.05 + i * 0.3));
+                    led.style.opacity = 0.3 + wave * 0.1;
                 }
             });
             
             // コンボライト更新
             rightLeds.forEach((led, i) => {
-                // ボーナス中でない場合のみコンボクラスを変更
-                if (!bonusModeActive) {
-                    led.classList.remove('combo', 'special');
-                    
-                    if (combo > 0) {
-                        const comboLeds = Math.min(combo, 20);
-                        if (i < comboLeds) {
-                            led.classList.add(combo >= 5 ? 'special' : 'combo');
-                        }
+                led.classList.remove('combo', 'special');
+                
+                if (combo > 0) {
+                    const comboLeds = Math.min(combo, 20);
+                    if (i < comboLeds) {
+                        led.classList.add(combo >= 5 ? 'special' : 'combo');
                     }
                 }
                 
-                // マルチボール時のエフェクト（ボーナス中は制限）
-                if (multiballActive && combo === 0 && !bonusModeActive) {
+                // マルチボール時のエフェクト
+                if (multiballActive && combo === 0) {
                     const wave = Math.sin((frameCount * 0.08 + i * 0.4 + Math.PI));
                     led.style.opacity = 0.4 + wave * 0.2;
                     led.classList.add('wave');
-                } else if (!multiballActive || bonusModeActive) {
+                } else if (!multiballActive) {
                     led.classList.remove('wave');
                     // 通常時のアイドルエフェクト
-                    if (ballCount > 0 && balls.length === 0 && combo === 0 && !bonusModeActive) {
+                    if (ballCount > 0 && balls.length === 0 && combo === 0) {
                         const wave = Math.sin((frameCount * 0.05 + i * 0.3 + Math.PI));
                         led.style.opacity = 0.3 + wave * 0.1;
                     }
@@ -1026,8 +946,7 @@
         // パワー更新
         function updatePower() {
             if (isChargingPower) {
-                const speedMultiplier = bonusModeActive ? 2 : 1;
-                power += powerDirection * 3 * speedMultiplier;
+                power += powerDirection * 3;
                 if (power >= 150) {
                     power = 150;
                     powerDirection = -1;
@@ -1038,13 +957,6 @@
                 
                 const powerFill = document.getElementById('powerFill');
                 powerFill.style.width = (power / 150) * 100 + '%';
-                
-                // ボーナス時のエフェクト
-                if (bonusModeActive) {
-                    powerFill.style.boxShadow = '0 0 15px #FF1493, 0 0 25px #FF1493';
-                } else {
-                    powerFill.style.boxShadow = '0 0 8px #FFEB3B, 0 0 16px #FF5722';
-                }
             }
         }
 
@@ -1054,22 +966,17 @@
                 combo++;
                 comboMultiplier = 1.0 + (combo * 0.2);
                 
-                // 高コンボ時の特殊演出と機能開放（タイミング調整）
-                if (combo === 10) {
-                    // ボーナスモード開始前にジャックポット演出
-                    triggerJackpotLights();
-                    // 少し遅らせてボーナスモード開始
-                    setTimeout(() => {
-                        activateBonusMode();
-                        checkAchievement('combo_master');
-                    }, 500);
-                } else if (combo === 5) {
+                // 高コンボ時の特殊演出と機能開放
+                if (combo === 5) {
                     triggerRainbowShow();
                     setTimeout(() => {
                         multiballActive = true;
                         updateFeatureIndicator();
                         checkAchievement('combo_streak');
                     }, 200);
+                } else if (combo === 10) {
+                    triggerSpecialLights();
+                    checkAchievement('combo_master');
                 } else if (combo === 15) {
                     setTimeout(() => {
                         powerZoneActive = true;
@@ -1083,64 +990,6 @@
                 comboMultiplier = 1.0;
             }
             updateComboDisplay();
-        }
-
-        // ボーナスモード開始
-        function activateBonusMode() {
-            bonusModeActive = true;
-            bonusModeTimer = 600; // 10秒間
-            
-            // 段階的にエフェクトを実行
-            setTimeout(() => {
-                const indicator = document.getElementById('bonusModeIndicator');
-                indicator.classList.add('active');
-            }, 50);
-            
-            // LEDエフェクト（少し遅らせて実行）
-            setTimeout(() => {
-                requestAnimationFrame(() => {
-                    [...leftLeds, ...rightLeds].forEach((led, i) => {
-                        setTimeout(() => {
-                            led.classList.add('jackpot');
-                        }, i * 15);
-                    });
-                });
-            }, 100);
-            
-            // 画面シェイク（エフェクト後に実行）
-            setTimeout(() => {
-                const container = document.getElementById('gameContainer');
-                container.classList.add('shake');
-                setTimeout(() => container.classList.remove('shake'), 300);
-            }, 200);
-            
-            // LEDエフェクト終了
-            setTimeout(() => {
-                requestAnimationFrame(() => {
-                    [...leftLeds, ...rightLeds].forEach(led => {
-                        led.classList.remove('jackpot');
-                    });
-                });
-            }, 1000);
-        }
-
-        // ボーナスモード終了
-        function deactivateBonusMode() {
-            bonusModeActive = false;
-            const indicator = document.getElementById('bonusModeIndicator');
-            indicator.classList.remove('active');
-            
-            // LEDライトのクリーンアップ
-            requestAnimationFrame(() => {
-                [...leftLeds, ...rightLeds].forEach(led => {
-                    led.classList.remove('jackpot', 'rainbow');
-                    led.style.opacity = ''; // opacityをリセット
-                });
-            });
-            
-            // パワーメーターのエフェクトもリセット
-            const powerFill = document.getElementById('powerFill');
-            powerFill.style.boxShadow = '0 0 8px #FFEB3B, 0 0 16px #FF5722';
         }
 
         // 機能表示更新
@@ -1231,8 +1080,8 @@
                     }
                 });
                 
-                // 重力と空気抵抗（ボーナス時は軽減）
-                ball.vy += bonusModeActive ? 0.2 : 0.3;
+                // 重力と空気抵抗
+                ball.vy += 0.3;
                 ball.vx *= 0.999;
                 ball.x += ball.vx;
                 ball.y += ball.vy;
@@ -1256,7 +1105,7 @@
                         const ty = nx;
                         const v_n = ball.vx * nx + ball.vy * ny;
                         const v_t = ball.vx * tx + ball.vy * ty;
-                        const restitution = bonusModeActive ? 0.9 : 0.7;
+                        const restitution = 0.7;
                         const v_n_after = -v_n * restitution;
                         ball.vx = v_n_after * nx + v_t * tx;
                         ball.vy = v_n_after * ny + v_t * ty;
@@ -1279,20 +1128,9 @@
                         
                         let points = pocket.points;
                         
-                        // ボーナスポケットの特別処理
-                        if (pocket.type === 'bonus') {
+                        // 特別なポケットの処理
+                        if (pocket.type === 'special') {
                             points *= 2;
-                            // ボーナスモードが既に有効でない場合のみ開始
-                            if (!bonusModeActive) {
-                                setTimeout(() => {
-                                    activateBonusMode();
-                                    checkAchievement('bonus_hunter');
-                                }, 200);
-                            } else {
-                                // 既にボーナス中の場合は時間延長
-                                bonusModeTimer += 300;
-                                checkAchievement('bonus_hunter');
-                            }
                         }
                         
                         // 特殊ボールの得点倍率
@@ -1300,11 +1138,6 @@
                             points *= 2;
                         } else if (ball.specialType === 'rainbow') {
                             points *= 1.5;
-                        }
-                        
-                        // ボーナスモード倍率
-                        if (bonusModeActive) {
-                            points *= 3;
                         }
                         
                         // コンボ倍率適用
@@ -1316,8 +1149,8 @@
                         updateDisplay();
                         updateHighScore();
                         
-                        // 大きなスコア時は画面シェイク
-                        if (points >= 1000) {
+                        // 大きなスコア時は画面シェイク（specialポケット以外）
+                        if (points >= 1000 && pocket.type !== 'special') {
                             const container = document.getElementById('gameContainer');
                             container.classList.add('shake');
                             setTimeout(() => container.classList.remove('shake'), 300);
@@ -1406,7 +1239,6 @@
                 'combo_master': 'コンボキング',
                 'combo_legend': 'コンボレジェンド',
                 'new_record': 'ハイスコア更新',
-                'bonus_hunter': 'ボーナスハンター',
                 'stage_clear': 'ステージクリア',
                 'multiball_master': 'マルチボールマスター'
             };
@@ -1607,21 +1439,12 @@
             
             // ポケットを描画
             pockets.forEach(pocket => {
-                if (pocket.type === 'bonus') {
-                    ctx.fillStyle = bonusModeActive ? '#FF1493' : '#FFD700';
-                    const gradient = ctx.createLinearGradient(pocket.x, pocket.y, pocket.x + pocket.width, pocket.y);
-                    gradient.addColorStop(0, '#FFD700');
-                    gradient.addColorStop(0.5, '#FF1493');
-                    gradient.addColorStop(1, '#00FFFF');
-                    ctx.fillStyle = gradient;
-                } else {
-                    ctx.fillStyle = '#FFD700';
-                }
+                ctx.fillStyle = '#FFD700';
                 ctx.fillRect(pocket.x, pocket.y, pocket.width, pocket.height);
                 ctx.fillStyle = '#000';
                 ctx.font = '12px Arial';
                 ctx.textAlign = 'center';
-                const text = pocket.type === 'bonus' ? 'BONUS' : pocket.points + 'pt';
+                const text = pocket.points + 'pt';
                 ctx.fillText(text, 
                     pocket.x + pocket.width/2, 
                     pocket.y + pocket.height/2 + 4);
@@ -1662,18 +1485,6 @@
                     ctx.fillStyle = ball.color;
                     ctx.beginPath();
                     ctx.arc(ball.x, ball.y, ball.radius + 1, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.restore();
-                }
-                
-                // ボーナスモード時のエフェクト
-                if (bonusModeActive) {
-                    ctx.save();
-                    ctx.shadowColor = '#FF1493';
-                    ctx.shadowBlur = 6;
-                    ctx.fillStyle = ball.color;
-                    ctx.beginPath();
-                    ctx.arc(ball.x, ball.y, ball.radius + 0.5, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.restore();
                 }
@@ -1837,36 +1648,18 @@
             }, 2000);
         }
         
-        // 大当たり演出（改良版）
-        function triggerJackpotLights() {
-            // ボーナスモード中は演出を控えめに
-            if (bonusModeActive) {
-                // ボーナス中は簡単な演出のみ
-                [...leftLeds, ...rightLeds].forEach(led => {
-                    led.classList.add('special');
-                });
-                
-                setTimeout(() => {
-                    requestAnimationFrame(() => {
-                        [...leftLeds, ...rightLeds].forEach(led => {
-                            led.classList.remove('special');
-                        });
-                    });
-                }, 800);
-                return;
-            }
-            
-            // 通常時の派手な演出
+        // 特殊ライト演出
+        function triggerSpecialLights() {
             [...leftLeds, ...rightLeds].forEach((led, i) => {
                 setTimeout(() => {
-                    led.classList.add('jackpot');
+                    led.classList.add('special');
                 }, i * 25);
             });
             
             setTimeout(() => {
                 requestAnimationFrame(() => {
                     [...leftLeds, ...rightLeds].forEach(led => {
-                        led.classList.remove('jackpot');
+                        led.classList.remove('special');
                     });
                 });
             }, 1500);
@@ -1926,10 +1719,6 @@
             multiballActive = false;
             powerZoneActive = false;
             powerZoneTimer = 0;
-            bonusModeTimer = 0;
-            
-            // ボーナスモード終了（確実にクリーンアップ）
-            deactivateBonusMode();
             
             updateDisplay();
             updateComboDisplay();
@@ -1939,7 +1728,7 @@
             // LEDライトの完全リセット
             requestAnimationFrame(() => {
                 [...leftLeds, ...rightLeds].forEach(led => {
-                    led.classList.remove('active', 'combo', 'special', 'jackpot', 'rainbow', 'wave');
+                    led.classList.remove('active', 'combo', 'special', 'rainbow', 'wave');
                     led.style.opacity = '';
                 });
             });
@@ -1954,7 +1743,6 @@
             
             const powerFill = document.getElementById('powerFill');
             powerFill.style.width = '33.3%';
-            powerFill.style.boxShadow = '0 0 8px #FFEB3B, 0 0 16px #FF5722';
             
             if (lightingAnimationId) {
                 cancelAnimationFrame(lightingAnimationId);
