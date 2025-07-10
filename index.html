@@ -507,7 +507,7 @@
     <div class="stage-clear-lighting" id="stageLighting"></div>
 
     <!-- 画面右上に固定表示 -->
-    <div class="global-status" style="position:fixed;top:24px;right:32px;z-index:10001;text-align:right;min-width:180px;">
+    <div class="global-status" style="position:fixed;top:24px;right:120px;z-index:10001;text-align:right;min-width:180px;">
         <div class="stage-info" id="stageInfo" style="color:#FFD700;font-weight:bold;font-size:18px;text-shadow:0 0 8px #FFD700,0 0 16px #fff;">ステージ: <b>1</b> ／ 目標スコア: <b>350</b></div>
         <div class="combo-info" id="comboInfo" style="color:#FF6B6B;font-size:18px;font-weight:bold;text-shadow:0 0 8px #FF6B6B;">コンボ: 0 (×1.0)</div>
     </div>
@@ -586,6 +586,11 @@
         let lightingAnimationId = null;
         let idleShowId = null;
         let shootingStarId = null;
+        
+        // パフォーマンス最適化用
+        let frameCount = 0;
+        let lastLightUpdate = 0;
+        let lastShootingStarCreate = 0;
 
         // 初期化
         function init() {
@@ -636,227 +641,108 @@
             const leftStrip = document.getElementById('leftLedStrip');
             const rightStrip = document.getElementById('rightLedStrip');
             
-            // 左側LED（35個に増加）
-            for (let i = 0; i < 35; i++) {
+            // 左側LED（20個に削減）
+            for (let i = 0; i < 20; i++) {
                 const led = document.createElement('div');
                 led.className = 'led';
                 leftStrip.appendChild(led);
                 leftLeds.push(led);
             }
             
-            // 右側LED（35個に増加）
-            for (let i = 0; i < 35; i++) {
+            // 右側LED（20個に削減）
+            for (let i = 0; i < 20; i++) {
                 const led = document.createElement('div');
                 led.className = 'led';
                 rightStrip.appendChild(led);
                 rightLeds.push(led);
             }
-            
-            startLightingAnimation();
         }
         
-        // ライトアニメーション開始
-        function startLightingAnimation() {
-            let frame = 0;
-            
-            function animate() {
-                // ゲーム中でない場合はアイドル演出に任せる
-                if (ballCount > 0 && balls.length === 0) {
-                    frame++;
-                    lightingAnimationId = requestAnimationFrame(animate);
-                    return;
+        // 統合アニメーションシステム（最適化済み）
+        function startOptimizedAnimations() {
+            function animationLoop() {
+                frameCount++;
+                const now = Date.now();
+                
+                // LEDライトの更新（60fps → 15fps）
+                if (now - lastLightUpdate > 66) {
+                    updateAllLights();
+                    lastLightUpdate = now;
                 }
                 
-                // ゲーム中の基本的な波状ライト
-                leftLeds.forEach((led, i) => {
-                    if (!led.classList.contains('active') && 
-                        !led.classList.contains('special') && 
-                        !led.classList.contains('jackpot') && 
-                        !led.classList.contains('rainbow')) {
-                        const wave = Math.sin((frame + i * 0.3) * 0.1);
-                        led.style.opacity = 0.3 + wave * 0.2;
-                    }
-                });
+                // 流星生成（2秒間隔 → 4秒間隔）
+                if (now - lastShootingStarCreate > 4000) {
+                    createSingleShootingStar();
+                    lastShootingStarCreate = now;
+                }
                 
-                rightLeds.forEach((led, i) => {
-                    if (!led.classList.contains('combo') && 
-                        !led.classList.contains('special') && 
-                        !led.classList.contains('jackpot') && 
-                        !led.classList.contains('rainbow')) {
-                        const wave = Math.sin((frame + i * 0.3 + Math.PI) * 0.1);
-                        led.style.opacity = 0.3 + wave * 0.2;
-                    }
-                });
-                
-                frame++;
-                lightingAnimationId = requestAnimationFrame(animate);
+                lightingAnimationId = requestAnimationFrame(animationLoop);
             }
             
-            animate();
+            animationLoop();
         }
         
-        // スコアライト更新（最適化済み）
-        function updateScoreLights() {
+        // LEDライト統合更新（最適化済み）
+        function updateAllLights() {
+            // スコアライト更新
             const scoreRatio = Math.min(score / targetScore, 1);
-            const activeLeds = Math.floor(scoreRatio * 35);
+            const activeLeds = Math.floor(scoreRatio * 20);
             
-            // バッチ更新でリフロー最小化
-            requestAnimationFrame(() => {
-                leftLeds.forEach((led, i) => {
-                    const shouldBeActive = i < activeLeds;
-                    const isCurrentlyActive = led.classList.contains('active');
-                    
-                    if (shouldBeActive !== isCurrentlyActive) {
-                        led.classList.toggle('active', shouldBeActive);
-                    }
-                });
-            });
-        }
-        
-        // コンボライト更新
-        function updateComboLights() {
-            requestAnimationFrame(() => {
-                rightLeds.forEach((led, i) => {
-                    led.classList.remove('combo', 'special');
-                    
-                    if (combo > 0) {
-                        const comboLeds = Math.min(combo, 35);
-                        if (i < comboLeds) {
-                            led.classList.add(combo >= 5 ? 'special' : 'combo');
-                        }
-                    }
-                });
-            });
-        }
-        
-        // 特殊ボールライト
-        function triggerSpecialBallLights(type) {
-            const duration = type === 'golden' ? 1500 : 1000;
-            const className = type === 'golden' ? 'special' : 'combo';
-            
-            // 全LEDを一時的に特殊状態に
-            [...leftLeds, ...rightLeds].forEach(led => {
-                led.classList.add(className);
-            });
-            
-            setTimeout(() => {
-                [...leftLeds, ...rightLeds].forEach(led => {
-                    led.classList.remove(className);
-                });
-                updateScoreLights();
-                updateComboLights();
-            }, duration);
-        }
-        
-        // ステージクリアライト
-        function triggerStageClearLights() {
-            const stageLighting = document.getElementById('stageLighting');
-            stageLighting.classList.add('active');
-            
-            // 全LEDを金色に
-            [...leftLeds, ...rightLeds].forEach(led => {
-                led.classList.add('special');
-            });
-            
-            setTimeout(() => {
-                stageLighting.classList.remove('active');
-                [...leftLeds, ...rightLeds].forEach(led => {
-                    led.classList.remove('special');
-                });
-                updateScoreLights();
-                updateComboLights();
-            }, 3000);
-        }
-        
-        // 背景エフェクト開始
-        function startBackgroundEffects() {
-            createShootingStars();
-            startIdleShow();
-        }
-        
-        // 流星生成
-        function createShootingStars() {
-            const container = document.getElementById('shootingStars');
-            
-            function createStar() {
-                const star = document.createElement('div');
-                star.className = 'shooting-star';
-                star.style.left = Math.random() * 100 + 'vw';
-                star.style.top = Math.random() * 100 + 'vh';
-                star.style.animationDelay = Math.random() * 3 + 's';
-                container.appendChild(star);
+            leftLeds.forEach((led, i) => {
+                const shouldBeActive = i < activeLeds;
+                const isCurrentlyActive = led.classList.contains('active');
                 
-                setTimeout(() => {
-                    if (container.contains(star)) {
-                        container.removeChild(star);
-                    }
-                }, 3000);
-            }
-            
-            // 定期的に流星を生成
-            shootingStarId = setInterval(createStar, 2000);
-        }
-        
-        // アイドル時のライトショー
-        function startIdleShow() {
-            let idleFrame = 0;
-            
-            function idleAnimation() {
-                if (ballCount > 0 && balls.length === 0) {
-                    // 波状パターン
-                    [...leftLeds, ...rightLeds].forEach((led, i) => {
-                        led.classList.remove('wave', 'rainbow');
-                        
-                        const wave = Math.sin((idleFrame + i * 0.2) * 0.05);
-                        if (wave > 0.5) {
-                            led.classList.add('wave');
-                        }
-                        
-                        // たまに虹色
-                        if (Math.sin((idleFrame + i * 0.1) * 0.02) > 0.8) {
-                            led.classList.add('rainbow');
-                        }
-                    });
+                if (shouldBeActive !== isCurrentlyActive) {
+                    led.classList.toggle('active', shouldBeActive);
                 }
                 
-                idleFrame++;
-                idleShowId = requestAnimationFrame(idleAnimation);
-            }
-            
-            idleAnimation();
-        }
-        
-        // 大当たり演出
-        function triggerJackpotLights() {
-            // 全LEDをジャックポットモードに
-            [...leftLeds, ...rightLeds].forEach((led, i) => {
-                setTimeout(() => {
-                    led.classList.add('jackpot');
-                }, i * 50);
+                // アイドル時の波エフェクト（軽量化）
+                if (ballCount > 0 && balls.length === 0 && !shouldBeActive) {
+                    const wave = Math.sin((frameCount * 0.05 + i * 0.3));
+                    led.style.opacity = 0.3 + wave * 0.1;
+                }
             });
             
-            setTimeout(() => {
-                [...leftLeds, ...rightLeds].forEach(led => {
-                    led.classList.remove('jackpot');
-                });
-                updateScoreLights();
-                updateComboLights();
-            }, 2000);
+            // コンボライト更新
+            rightLeds.forEach((led, i) => {
+                led.classList.remove('combo', 'special');
+                
+                if (combo > 0) {
+                    const comboLeds = Math.min(combo, 20);
+                    if (i < comboLeds) {
+                        led.classList.add(combo >= 5 ? 'special' : 'combo');
+                    }
+                }
+                
+                // アイドル時のエフェクト（軽量化）
+                if (ballCount > 0 && balls.length === 0 && combo === 0) {
+                    const wave = Math.sin((frameCount * 0.05 + i * 0.3 + Math.PI));
+                    led.style.opacity = 0.3 + wave * 0.1;
+                }
+            });
         }
         
-        // レインボー演出
-        function triggerRainbowShow() {
-            [...leftLeds, ...rightLeds].forEach((led, i) => {
-                setTimeout(() => {
-                    led.classList.add('rainbow');
-                }, i * 30);
-            });
+        // 軽量化された流星生成
+        function createSingleShootingStar() {
+            const container = document.getElementById('shootingStars');
+            if (container.children.length > 5) return; // 最大5個まで
+            
+            const star = document.createElement('div');
+            star.className = 'shooting-star';
+            star.style.left = Math.random() * 100 + 'vw';
+            star.style.top = Math.random() * 100 + 'vh';
+            container.appendChild(star);
             
             setTimeout(() => {
-                [...leftLeds, ...rightLeds].forEach(led => {
-                    led.classList.remove('rainbow');
-                });
+                if (container.contains(star)) {
+                    container.removeChild(star);
+                }
             }, 3000);
+        }
+        
+        // 背景エフェクト開始（軽量化）
+        function startBackgroundEffects() {
+            startOptimizedAnimations();
         }
 
         // イベント設定
@@ -968,10 +854,10 @@
             }
         }
 
-        // 発射エフェクト
+        // 発射エフェクト（軽量化）
         function showLaunchEffect(x, y, specialType) {
             const effectLayer = document.getElementById('effectLayer');
-            const particleCount = specialType === 'golden' || specialType === 'rainbow' ? 24 : 18;
+            const particleCount = specialType === 'golden' || specialType === 'rainbow' ? 12 : 8; // 粒子数を削減
             
             for (let i = 0; i < particleCount; i++) {
                 const p = document.createElement('div');
@@ -981,16 +867,16 @@
                 p.style.position = 'absolute';
                 p.style.left = (canvas.getBoundingClientRect().left + px - 4) + 'px';
                 p.style.top = (canvas.getBoundingClientRect().top + py - 4) + 'px';
-                p.style.width = '8px';
-                p.style.height = '8px';
+                p.style.width = '6px'; // サイズ縮小
+                p.style.height = '6px';
                 p.style.borderRadius = '50%';
                 
                 if (specialType === 'golden') {
                     p.style.background = `linear-gradient(45deg, #FFD700, #FFA500)`;
-                    p.style.boxShadow = '0 0 8px #FFD700';
+                    p.style.boxShadow = '0 0 6px #FFD700';
                 } else if (specialType === 'rainbow') {
-                    p.style.background = `linear-gradient(45deg, hsl(${i * 15}, 100%, 60%), hsl(${(i * 15 + 60) % 360}, 100%, 60%))`;
-                    p.style.boxShadow = '0 0 8px rgba(255,255,255,0.8)';
+                    p.style.background = `linear-gradient(45deg, hsl(${i * 30}, 100%, 60%), hsl(${(i * 30 + 60) % 360}, 100%, 60%))`;
+                    p.style.boxShadow = '0 0 6px rgba(255,255,255,0.8)';
                 } else {
                     p.style.background = `linear-gradient(45deg, #FFD700, #FF8E53)`;
                 }
@@ -998,13 +884,13 @@
                 p.style.opacity = '0.8';
                 p.style.pointerEvents = 'none';
                 p.style.zIndex = '100';
-                p.style.transition = 'all 0.7s cubic-bezier(.4,2,.6,1)';
+                p.style.transition = 'all 0.5s ease-out'; // 短縮
                 setTimeout(() => {
-                    p.style.left = (canvas.getBoundingClientRect().left + x + Math.cos(angle) * 60 - 4) + 'px';
-                    p.style.top = (canvas.getBoundingClientRect().top + y + Math.sin(angle) * 60 - 4) + 'px';
+                    p.style.left = (canvas.getBoundingClientRect().left + x + Math.cos(angle) * 40 - 4) + 'px';
+                    p.style.top = (canvas.getBoundingClientRect().top + y + Math.sin(angle) * 40 - 4) + 'px';
                     p.style.opacity = '0';
                 }, 10);
-                setTimeout(() => effectLayer.removeChild(p), 800);
+                setTimeout(() => effectLayer.removeChild(p), 600);
                 effectLayer.appendChild(p);
             }
         }
@@ -1026,7 +912,7 @@
             }
         }
 
-        // コンボ更新
+        // コンボ更新（最適化済み）
         function updateCombo(success) {
             if (success) {
                 combo++;
@@ -1043,7 +929,6 @@
                 comboMultiplier = 1.0;
             }
             updateComboDisplay();
-            updateComboLights();
         }
 
         // コンボ表示更新
@@ -1062,22 +947,22 @@
 
         let gameOverDialogShown = false;
 
-        // ボール更新
+        // ボール更新（最適化済み）
         function updateBalls() {
             for (let i = balls.length - 1; i >= 0; i--) {
                 const ball = balls[i];
                 
-                // 軌跡を記録
-                if (!ball.launching) {
+                // 軌跡を記録（間引き）
+                if (!ball.launching && frameCount % 2 === 0) {
                     ball.trail.push({x: ball.x, y: ball.y});
-                    if (ball.trail.length > 8) {
+                    if (ball.trail.length > 5) { // 軌跡を短縮
                         ball.trail.shift();
                     }
                 }
                 
-                // レインボーボールの色更新
-                if (ball.specialType === 'rainbow') {
-                    ball.color = `hsl(${Date.now() / 10 % 360}, 100%, 60%)`;
+                // レインボーボールの色更新（頻度を下げる）
+                if (ball.specialType === 'rainbow' && frameCount % 10 === 0) {
+                    ball.color = `hsl(${Date.now() / 20 % 360}, 100%, 60%)`;
                 }
                 
                 // 発射レーン上昇中
@@ -1124,7 +1009,10 @@
                         const overlap = ball.radius + obstacle.radius - distance;
                         ball.x += nx * overlap;
                         ball.y += ny * overlap;
-                        showObstacleEffect(obstacle.x, obstacle.y);
+                        // エフェクトを軽量化
+                        if (frameCount % 5 === 0) {
+                            showObstacleEffect(obstacle.x, obstacle.y);
+                        }
                     }
                 });
                 
@@ -1202,31 +1090,31 @@
             effectLayer.appendChild(p);
         }
 
-        // 釘エフェクト
+        // 釘エフェクト（軽量化）
         function showObstacleEffect(x, y) {
             const effectLayer = document.getElementById('effectLayer');
-            for (let i = 0; i < 8; i++) {
+            for (let i = 0; i < 4; i++) { // パーティクル数を半減
                 const p = document.createElement('div');
-                const angle = (i / 8) * Math.PI * 2;
+                const angle = (i / 4) * Math.PI * 2;
                 const px = x + Math.cos(angle) * 2;
                 const py = y + Math.sin(angle) * 2;
                 p.style.position = 'absolute';
                 p.style.left = (canvas.getBoundingClientRect().left + px - 2) + 'px';
                 p.style.top = (canvas.getBoundingClientRect().top + py - 2) + 'px';
-                p.style.width = '4px';
-                p.style.height = '4px';
+                p.style.width = '3px'; // サイズ縮小
+                p.style.height = '3px';
                 p.style.borderRadius = '50%';
                 p.style.background = 'linear-gradient(45deg, #FFD700, #fff)';
                 p.style.opacity = '0.7';
                 p.style.pointerEvents = 'none';
                 p.style.zIndex = '100';
-                p.style.transition = 'all 0.5s cubic-bezier(.4,2,.6,1)';
+                p.style.transition = 'all 0.3s ease-out'; // 時間短縮
                 setTimeout(() => {
-                    p.style.left = (canvas.getBoundingClientRect().left + x + Math.cos(angle) * 18 - 2) + 'px';
-                    p.style.top = (canvas.getBoundingClientRect().top + y + Math.sin(angle) * 18 - 2) + 'px';
+                    p.style.left = (canvas.getBoundingClientRect().left + x + Math.cos(angle) * 12 - 2) + 'px';
+                    p.style.top = (canvas.getBoundingClientRect().top + y + Math.sin(angle) * 12 - 2) + 'px';
                     p.style.opacity = '0';
                 }, 10);
-                setTimeout(() => effectLayer.removeChild(p), 600);
+                setTimeout(() => effectLayer.removeChild(p), 400);
                 effectLayer.appendChild(p);
             }
         }
@@ -1265,7 +1153,7 @@
             effectLayer.appendChild(p);
         }
 
-        // 描画
+        // 描画（最適化済み）
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
@@ -1299,16 +1187,17 @@
                     pocket.y + pocket.height/2 + 4);
             });
             
-            // ボールの軌跡を描画
+            // ボールの軌跡を描画（軽量化）
             balls.forEach(ball => {
-                if (ball.trail && ball.trail.length > 1) {
+                if (ball.trail && ball.trail.length > 2) {
                     ctx.strokeStyle = ball.specialType === 'rainbow' ? 
-                        `hsla(${Date.now() / 10 % 360}, 100%, 60%, 0.3)` : 
-                        'rgba(255, 215, 0, 0.3)';
-                    ctx.lineWidth = 2;
+                        `hsla(${Date.now() / 20 % 360}, 100%, 60%, 0.5)` : 
+                        'rgba(255, 215, 0, 0.4)';
+                    ctx.lineWidth = 1.5; // 軽量化
                     ctx.beginPath();
                     ctx.moveTo(ball.trail[0].x, ball.trail[0].y);
-                    for (let i = 1; i < ball.trail.length; i++) {
+                    // 軌跡を間引いて描画
+                    for (let i = 2; i < ball.trail.length; i += 2) {
                         ctx.lineTo(ball.trail[i].x, ball.trail[i].y);
                     }
                     ctx.stroke();
@@ -1317,20 +1206,20 @@
             
             // ボールを描画
             balls.forEach(ball => {
-                // 特殊ボールのオーラ
+                // 特殊ボールのオーラ（軽量化）
                 if (ball.specialType === 'golden') {
                     ctx.save();
                     ctx.shadowColor = '#FFD700';
-                    ctx.shadowBlur = 15;
+                    ctx.shadowBlur = 10; // 軽量化
                     ctx.fillStyle = ball.color;
                     ctx.beginPath();
-                    ctx.arc(ball.x, ball.y, ball.radius + 2, 0, Math.PI * 2);
+                    ctx.arc(ball.x, ball.y, ball.radius + 1, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.restore();
                 } else if (ball.specialType === 'rainbow') {
                     ctx.save();
                     ctx.shadowColor = ball.color;
-                    ctx.shadowBlur = 10;
+                    ctx.shadowBlur = 8; // 軽量化
                     ctx.fillStyle = ball.color;
                     ctx.beginPath();
                     ctx.arc(ball.x, ball.y, ball.radius + 1, 0, Math.PI * 2);
@@ -1352,33 +1241,35 @@
             });
         }
 
-        // 表示更新
+        // 表示更新（最適化済み）
         function updateDisplay() {
             const ballCountElem = document.getElementById('ballCount');
             const scoreElem = document.getElementById('score');
             ballCountElem.textContent = ballCount;
             scoreElem.textContent = score;
-            // ステージ・コンボ表示を画面右上に
+            
+            // ステージ表示を画面右上に
             const stageElem = document.getElementById('stageInfo');
             if (stageElem) {
                 stageElem.innerHTML = `ステージ: <b>${stage}</b> ／ 目標スコア: <b>${targetScore}</b>`;
             }
-            // コンボ表示はupdateComboDisplay()で管理
-            ballCountElem.animate([
-                { transform: 'scale(1)', color: '#fff' },
-                { transform: 'scale(1.3)', color: '#FFD700' },
-                { transform: 'scale(1)', color: '#fff' }
-            ], { duration: 400 });
-            scoreElem.animate([
-                { transform: 'scale(1)', color: '#fff' },
-                { transform: 'scale(1.3)', color: '#FFD700' },
-                { transform: 'scale(1)', color: '#fff' }
-            ], { duration: 400 });
+            
+            // アニメーション軽量化
+            if (frameCount % 10 === 0) { // 10フレームに1回だけアニメーション
+                ballCountElem.animate([
+                    { transform: 'scale(1)', color: '#fff' },
+                    { transform: 'scale(1.2)', color: '#FFD700' },
+                    { transform: 'scale(1)', color: '#fff' }
+                ], { duration: 300 });
+                scoreElem.animate([
+                    { transform: 'scale(1)', color: '#fff' },
+                    { transform: 'scale(1.2)', color: '#FFD700' },
+                    { transform: 'scale(1)', color: '#fff' }
+                ], { duration: 300 });
+            }
+            
             const launchBtn = document.getElementById('launchBtn');
             launchBtn.disabled = ballCount <= 0;
-            
-            // ライト更新
-            updateScoreLights();
         }
 
         // ゲームオーバー演出
@@ -1416,33 +1307,111 @@
             }
         }
 
-        // 花火エフェクト
+        // 花火エフェクト（軽量化）
         function showFirework(cx, cy) {
             const effectLayer = document.getElementById('effectLayer');
-            for (let i = 0; i < 24; i++) {
+            for (let i = 0; i < 12; i++) { // パーティクル数を半減
                 const p = document.createElement('div');
-                const angle = (i / 24) * Math.PI * 2;
+                const angle = (i / 12) * Math.PI * 2;
                 const px = cx + Math.cos(angle) * 8;
                 const py = cy + Math.sin(angle) * 8;
                 p.style.position = 'absolute';
                 p.style.left = (px) + 'px';
                 p.style.top = (py) + 'px';
-                p.style.width = '10px';
-                p.style.height = '10px';
+                p.style.width = '8px';
+                p.style.height = '8px';
                 p.style.borderRadius = '50%';
                 p.style.background = `linear-gradient(45deg, #FFD700, #FF8E53, #fff)`;
                 p.style.opacity = '0.9';
                 p.style.pointerEvents = 'none';
                 p.style.zIndex = '10000';
-                p.style.transition = 'all 1.2s cubic-bezier(.4,2,.6,1)';
+                p.style.transition = 'all 1s ease-out'; // 時間短縮
                 setTimeout(() => {
-                    p.style.left = (cx + Math.cos(angle) * 80) + 'px';
-                    p.style.top = (cy + Math.sin(angle) * 80) + 'px';
+                    p.style.left = (cx + Math.cos(angle) * 60) + 'px';
+                    p.style.top = (cy + Math.sin(angle) * 60) + 'px';
                     p.style.opacity = '0';
                 }, 10);
-                setTimeout(() => effectLayer.removeChild(p), 1300);
+                setTimeout(() => effectLayer.removeChild(p), 1100);
                 effectLayer.appendChild(p);
             }
+        }
+        
+        // 特殊ボールライト（最適化済み）
+        function triggerSpecialBallLights(type) {
+            const duration = type === 'golden' ? 1000 : 800; // 時間短縮
+            const className = type === 'golden' ? 'special' : 'combo';
+            
+            // LEDを一時的に特殊状態に（バッチ処理）
+            requestAnimationFrame(() => {
+                [...leftLeds, ...rightLeds].forEach(led => {
+                    led.classList.add(className);
+                });
+            });
+            
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    [...leftLeds, ...rightLeds].forEach(led => {
+                        led.classList.remove(className);
+                    });
+                });
+            }, duration);
+        }
+        
+        // ステージクリアライト（最適化済み）
+        function triggerStageClearLights() {
+            const stageLighting = document.getElementById('stageLighting');
+            stageLighting.classList.add('active');
+            
+            // 全LEDを金色に（バッチ処理）
+            requestAnimationFrame(() => {
+                [...leftLeds, ...rightLeds].forEach(led => {
+                    led.classList.add('special');
+                });
+            });
+            
+            setTimeout(() => {
+                stageLighting.classList.remove('active');
+                requestAnimationFrame(() => {
+                    [...leftLeds, ...rightLeds].forEach(led => {
+                        led.classList.remove('special');
+                    });
+                });
+            }, 2000); // 時間短縮
+        }
+        
+        // 大当たり演出（最適化済み）
+        function triggerJackpotLights() {
+            // 全LEDをジャックポットモードに（バッチ処理）
+            [...leftLeds, ...rightLeds].forEach((led, i) => {
+                setTimeout(() => {
+                    led.classList.add('jackpot');
+                }, i * 25); // 間隔短縮
+            });
+            
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    [...leftLeds, ...rightLeds].forEach(led => {
+                        led.classList.remove('jackpot');
+                    });
+                });
+            }, 1500); // 時間短縮
+        }
+        
+        // レインボー演出（最適化済み）
+        function triggerRainbowShow() {
+            [...leftLeds, ...rightLeds].forEach((led, i) => {
+                setTimeout(() => {
+                    led.classList.add('rainbow');
+                }, i * 20); // 間隔短縮
+            });
+            
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    [...leftLeds, ...rightLeds].forEach(led => {
+                        led.classList.remove('rainbow');
+                    });
+                });
+            }, 2000); // 時間短縮
         }
 
         function nextStage() {
@@ -1461,7 +1430,7 @@
             powerFill.style.width = '33.3%';
         }
 
-        // ゲームリセット
+        // ゲームリセット（最適化済み）
         function resetGame() {
             balls = [];
             score = 0;
@@ -1475,23 +1444,47 @@
             combo = 0;
             comboMultiplier = 1.0;
             ballsLaunched = 0;
+            frameCount = 0; // フレームカウントリセット
             updateDisplay();
             updateComboDisplay();
             updateSpecialBallIndicator();
             
-            // ライトリセット
-            [...leftLeds, ...rightLeds].forEach(led => {
-                led.classList.remove('active', 'combo', 'special');
+            // ライトリセット（バッチ処理）
+            requestAnimationFrame(() => {
+                [...leftLeds, ...rightLeds].forEach(led => {
+                    led.classList.remove('active', 'combo', 'special', 'jackpot', 'rainbow');
+                    led.style.opacity = '';
+                });
             });
+            
             const stageLighting = document.getElementById('stageLighting');
             stageLighting.classList.remove('active');
             
+            // ダイアログクリーンアップ
             const dialog = document.getElementById('gameOverDialog');
             const effectLayer = document.getElementById('effectLayer');
             if (dialog && dialog.parentNode) dialog.parentNode.removeChild(dialog);
             if (effectLayer) effectLayer.style.pointerEvents = 'none';
+            
             const powerFill = document.getElementById('powerFill');
             powerFill.style.width = '33.3%';
+            
+            // アニメーションID管理
+            if (lightingAnimationId) {
+                cancelAnimationFrame(lightingAnimationId);
+                lightingAnimationId = null;
+            }
+            if (idleShowId) {
+                cancelAnimationFrame(idleShowId);
+                idleShowId = null;
+            }
+            if (shootingStarId) {
+                clearInterval(shootingStarId);
+                shootingStarId = null;
+            }
+            
+            // 再スタート
+            startBackgroundEffects();
         }
 
         // ゲームループ
